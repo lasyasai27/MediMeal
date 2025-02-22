@@ -617,71 +617,77 @@ def main():
    st.markdown("# 💊 MediMeal")
    st.markdown("# MediMeal: Smart Prescription & Nutrition Advisor")
   
-   # Search section - Modified to use a single searchable selectbox
+   # Search section
    st.markdown("### 🔍 Search Medications")
    
-   # Create the selectbox with search functionality
-   selected_medication = st.selectbox(
-       "Search for medications",
-       options=get_medication_suggestions(""),  # Get all medications initially
-       placeholder="Start typing to search medications...",
-       key="med_select"
-   )
+   # Create two columns for the search inputs
+   col1, col2 = st.columns([2, 1])
    
-   condition = st.text_input(
-       "Medical Condition (Optional)",
-       placeholder="e.g., fever",
-       key="condition_search"
-   )
-   
-   dosage = st.text_input(
-       "Dosage (Optional)",
-       placeholder="e.g., 500mg",
-       key="dosage_input"
-   )
-
+   with col1:
+       selected_medication = st.selectbox(
+           "Search for medications",
+           options=get_medication_suggestions(""),
+           placeholder="Start typing to search medications...",
+           key="med_select"
+       )
+       
+       condition = st.text_input(
+           "Medical Condition (Optional)",
+           placeholder="e.g., fever",
+           key="condition_search"
+       )
+       
+       dosage = st.text_input(
+           "Dosage (Optional)",
+           placeholder="e.g., 500mg",
+           key="dosage_input"
+       )
+       
+       # Add analyze button right after inputs
+       analyze_button = st.button("🔍 Analyze Medication", type="primary", use_container_width=True)
 
    # Main content and info columns
    main_col, info_col = st.columns([2, 1])
   
    with main_col:
-       if selected_medication:
-           # Add to recent searches with dosage
-           add_to_recent_searches(selected_medication, condition, dosage)
-           
-           # Search for medications
-           results = search_medications(selected_medication, condition)
-           
-           if results:
-               if condition:
-                   matching_results = [r for r in results if r.get('condition_info', {}).get('matches', False)]
-                   st.write(f"Found {len(matching_results)} medications indicated for {condition}")
-                   st.write(f"(Showing all {len(results)} related medications)")
-              
-               for idx, result in enumerate(results):
-                   formatted_details = format_medication_details(result)
+       if selected_medication and analyze_button:
+           with st.spinner('Analyzing medication...'):
+               # Add to recent searches with dosage
+               add_to_recent_searches(selected_medication, condition, dosage)
+               
+               # Search for medications
+               results = search_medications(selected_medication, condition)
+               
+               if results:
+                   if condition:
+                       matching_results = [r for r in results if r.get('condition_info', {}).get('matches', False)]
+                       st.write(f"Found {len(matching_results)} medications indicated for {condition}")
+                       st.write(f"(Showing all {len(results)} related medications)")
                   
-                   with st.expander(f"{formatted_details['name']}"):
-                       # Save button and dosage display in top row
-                       col1, col2, col3 = st.columns([3, 2, 1])
-                       with col1:
-                           if dosage:
-                               st.markdown(f"**📊 Dosage:** {dosage}")
-                       with col3:
-                           if st.button("Save", key=f"save_{idx}", type="primary"):
-                               result['dosage'] = dosage  # Add dosage to saved medication
-                               save_medication(result)
+                   for idx, result in enumerate(results):
+                       formatted_details = format_medication_details(result)
                       
-                       # Medication details
-                       st.markdown("### 💊 Medication Details")
-                       st.write(f"**Form:** {formatted_details['type']}")
-                      
-                       # Active ingredients
-                       st.markdown("### 🧪 Active Ingredients")
-                       for ing in formatted_details['ingredients']:
-                           st.write(f"• {ing}")
-           else:
-               st.info("No medications found. Try a different search term.")
+                       with st.expander(f"{formatted_details['name']}"):
+                           # Save button and dosage display in top row
+                           col1, col2, col3 = st.columns([3, 2, 1])
+                           with col1:
+                               if dosage:
+                                   st.markdown(f"**📊 Dosage:** {dosage}")
+                           with col3:
+                               if st.button("Save", key=f"save_{idx}", type="primary"):
+                                   result['dosage'] = dosage  # Add dosage to saved medication
+                                   save_medication(result)
+                          
+                           # Medication details
+                           st.markdown("### 💊 Medication Details")
+                           st.write(f"**Form:** {formatted_details['type']}")
+                          
+                           # Active ingredients
+                           st.markdown("### 🧪 Active Ingredients")
+                           for ing in formatted_details['ingredients']:
+                               st.write(f"• {ing}")
+               else:
+                   st.info("No medications found. Try a different search term.")
   
    # Right info column removed as content moved to sidebar
    with info_col:
