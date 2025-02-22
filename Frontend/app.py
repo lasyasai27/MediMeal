@@ -19,6 +19,16 @@ if 'recent_searches' not in st.session_state:
    st.session_state.recent_searches = []
 
 
+# Add this dictionary at the top of your file
+COMMON_MEDICINE_NAMES = {
+    "Acetaminophen (Tylenol)": "acetaminophen",
+    "Ibuprofen (Advil)": "ibuprofen",
+    "Aspirin": "aspirin",
+    "Naproxen (Aleve)": "naproxen",
+    "Diphenhydramine (Benadryl)": "diphenhydramine"
+}
+
+
 def search_condition_medications(condition: str) -> List[str]:
    """Search for any medical condition using RxNav"""
    try:
@@ -233,12 +243,11 @@ def display_price_details(price_info: Dict):
        """, unsafe_allow_html=True)
 
 
-def add_to_recent_searches(medication: str, condition: str = None, dosage: str = None):
+def add_to_recent_searches(medication: str, condition: str = None):
    """Add a search to recent searches"""
    search = {
        'medication': medication,
        'condition': condition,
-       'dosage': dosage,
        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
    }
    if search not in st.session_state.recent_searches:
@@ -556,7 +565,7 @@ def main():
                    if med.get('dosage'):
                        st.caption(f"📊 Dosage: {med['dosage']}")
                with col2:
-                   if st.button("🗑️", key=f"remove_saved_{med['name']}", help="Remove medication"):
+                   if st.button("×", key=f"remove_saved_{med['name']}", help="Remove medication"):
                        remove_saved_medication(med)
        else:
            st.info("No saved medications yet")
@@ -581,7 +590,7 @@ def main():
                        st.caption(f"🏥 For: {search['condition']}")
                    st.caption(f"⏰ {search['timestamp']}")
                with col2:
-                   if st.button("🗑️", key=f"remove_recent_{idx}", help="Remove from history"):
+                   if st.button("×", key=f"remove_recent_{idx}", help="Remove from history"):
                        st.session_state.recent_searches.pop(idx)
                        st.rerun()
        else:
@@ -591,9 +600,9 @@ def main():
        st.markdown("### ✍️ How it Works")
        st.markdown("""
        1. Search for your medication
-       2. Select from the suggestions
-       3. View detailed analysis
-       4. Save medications for later
+       2. View detailed information
+       3. Check for interactions
+       4. Get dietary recommendations
        """)
        
        st.markdown("### ✨ Features")
@@ -613,20 +622,63 @@ def main():
        """)
 
    # Main content area
-   # Logo and title
+   # Display header first
    st.markdown("# 💊 MediMeal")
-   st.markdown("# MediMeal: Smart Prescription & Nutrition Advisor")
-  
-   # Search section - Modified to use a single searchable selectbox
+   st.markdown("## Smart Prescription & Nutrition Advisor")
+   
+   # Add custom CSS for styling
+   st.markdown("""
+       <style>
+       /* Button styles */
+       .stButton button[kind="secondary"] {
+           padding: 0.2rem 0.5rem;
+           font-size: 0.7rem;
+       }
+       
+       .stButton > button:nth-child(1) {
+           padding: 0rem;
+           font-size: 0.7rem;
+           line-height: 1;
+           border: none;
+           background: transparent;
+           box-shadow: none;
+       }
+       
+       .stButton > button:hover {
+           border: none;
+           background: transparent;
+           box-shadow: none;
+       }
+
+       /* Analyze button style */
+       div[data-testid="stButton"] > button:first-child {
+           background-color: #ff4b4b;
+           border-color: #ff4b4b;
+           color: white;
+           font-size: 1.1rem;
+           padding: 0.75rem 1.5rem;
+           width: 100%;
+       }
+
+       div[data-testid="stButton"] > button:hover {
+           background-color: #ff3333;
+           border-color: #ff3333;
+       }
+       </style>
+   """, unsafe_allow_html=True)
+
+   # Search section
    st.markdown("### 🔍 Search Medications")
    
-   # Create the selectbox with search functionality
+   # Input fields
    selected_medication = st.selectbox(
        "Search for medications",
-       options=get_medication_suggestions(""),  # Get all medications initially
+       options=get_medication_suggestions(""),
        placeholder="Start typing to search medications...",
        key="med_select"
    )
+   
+   st.write("")  # Add spacing
    
    condition = st.text_input(
        "Medical Condition (Optional)",
@@ -634,24 +686,25 @@ def main():
        key="condition_search"
    )
    
+   st.write("")  # Add spacing
+   
    dosage = st.text_input(
        "Dosage (Optional)",
        placeholder="e.g., 500mg",
        key="dosage_input"
    )
+   
+   # Add spacing before button
+   st.write("")
+   st.write("")
+   
+   # Red analyze button
+   analyze_button = st.button("🔍 Analyze Medication", use_container_width=True)
 
-
-   # Main content and info columns
-   main_col, info_col = st.columns([2, 1])
-  
-   with main_col:
-       if selected_medication:
-           # Add to recent searches with dosage
-           add_to_recent_searches(selected_medication, condition, dosage)
-           
-           # Search for medications
+   # Main content area
+   if selected_medication and analyze_button:
+       with st.spinner('Analyzing medication...'):
            results = search_medications(selected_medication, condition)
-           
            if results:
                if condition:
                    matching_results = [r for r in results if r.get('condition_info', {}).get('matches', False)]
@@ -682,10 +735,58 @@ def main():
                            st.write(f"• {ing}")
            else:
                st.info("No medications found. Try a different search term.")
-  
-   # Right info column removed as content moved to sidebar
-   with info_col:
-       pass  # Empty column for spacing, or you can remove this section entirely
+
+           # Get recommendations
+           try:
+               # Convert common names to generic names
+               search_term = COMMON_MEDICINE_NAMES.get(selected_medication, selected_medication)
+               
+               rec_response = requests.get(f"{API_URL}/recommendations/{search_term}")
+               if rec_response.status_code == 200:
+                   recommendations = rec_response.json()
+                   
+                   st.markdown("### 🔍 Similar Medications")
+                   for rec in recommendations:
+                       with st.expander(f"💊 {rec['name']} (Similarity: {rec['similarity_score']:.2f})"):
+                           col1, col2 = st.columns([2, 1])
+                           with col1:
+                               st.write("**Classes:**")
+                               st.write(f"• Chemical: {rec['chemical_class']}")
+                               st.write(f"• Therapeutic: {rec['therapeutic_class']}")
+                           with col2:
+                               st.write("**Uses:**")
+                               for use in rec['uses']:
+                                   if use and use.lower() != 'nan':
+                                       st.write(f"• {use}")
+           
+               # Get side effects
+               side_effects_response = requests.get(f"{API_URL}/side-effects/{search_term}")
+               if side_effects_response.status_code == 200:
+                   side_effects = side_effects_response.json()
+                   
+                   st.markdown("### ⚠️ Side Effects and Details")
+                   
+                   col1, col2 = st.columns(2)
+                   with col1:
+                       st.markdown("**Side Effects:**")
+                       for effect in side_effects['side_effects']:
+                           if effect and effect.lower() != 'nan':
+                               st.write(f"• {effect.strip()}")
+                   
+                   with col2:
+                       st.markdown("**Drug Information:**")
+                       st.write(f"**Chemical Class:** {side_effects['chemical_class']}")
+                       st.write(f"**Therapeutic Class:** {side_effects['therapeutic_class']}")
+                       st.write(f"**Habit Forming:** {side_effects['habit_forming']}")
+                   
+                   if side_effects['substitutes']:
+                       st.markdown("**Available Substitutes:**")
+                       for sub in side_effects['substitutes']:
+                           if sub and sub.lower() != 'nan':
+                               st.write(f"• {sub.strip()}")
+           
+           except Exception as e:
+               st.error(f"Error getting recommendations: {str(e)}")
 
 
 if __name__ == "__main__":
