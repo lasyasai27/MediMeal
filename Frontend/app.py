@@ -462,6 +462,45 @@ def set_page_style():
    """, unsafe_allow_html=True)
 
 
+def get_medication_suggestions(search_query: str) -> List[str]:
+    """Get medication suggestions based on user input"""
+    # Sample medication list - in production, this would come from your API/database
+    common_medications = [
+        "Acetaminophen (Tylenol)",
+        "Ibuprofen (Advil)",
+        "Aspirin",
+        "Amoxicillin",
+        "Lisinopril",
+        "Metformin",
+        "Amlodipine",
+        "Metoprolol",
+        "Omeprazole",
+        "Simvastatin",
+        "Losartan",
+        "Gabapentin",
+        "Sertraline",
+        "Levothyroxine",
+        "Atorvastatin",
+        "Escitalopram",
+        "Fluoxetine",
+        "Pantoprazole",
+        "Hydrochlorothiazide",
+        "Prednisone"
+    ]
+    
+    if not search_query:
+        return common_medications
+    
+    # Filter medications that match the search query (case-insensitive)
+    return [med for med in common_medications if search_query.lower() in med.lower()]
+
+
+def clear_recent_searches():
+    """Clear all recent searches"""
+    st.session_state.recent_searches = []
+    st.rerun()
+
+
 def main():
    # Set wide mode by default
    st.set_page_config(
@@ -479,26 +518,72 @@ def main():
        </style>
    """, unsafe_allow_html=True)
   
+   # Add custom CSS to style the buttons
+   st.markdown("""
+       <style>
+       /* Make the Clear All buttons smaller */
+       .stButton button[kind="secondary"] {
+           padding: 0.2rem 0.5rem;
+           font-size: 0.7rem;
+       }
+       
+       /* Make the trash emoji buttons smaller */
+       .stButton button {
+           padding: 0rem 0.5rem;
+           font-size: 0.7rem;
+           line-height: 1;
+       }
+       </style>
+   """, unsafe_allow_html=True)
+  
    # Rest of your main code
    with st.sidebar:
-       st.markdown("## 📋 Saved Medications")
+       # Saved Medications section
+       col1, col2 = st.columns([3, 1])
+       with col1:
+           st.markdown("## 📋 Saved Medications")
+       with col2:
+           if st.session_state.saved_medications:
+               if st.button("Clear All", key="clear_saved", type="secondary", use_container_width=True):
+                   st.session_state.saved_medications = []
+                   st.rerun()
+       
        if st.session_state.saved_medications:
            for med in st.session_state.saved_medications:
-               st.write(f"• {med['name']}")
-               if med.get('dosage'):
-                   st.caption(f"📊 Dosage: {med['dosage']}")
+               col1, col2 = st.columns([4, 1])
+               with col1:
+                   st.write(f"• {med['name']}")
+                   if med.get('dosage'):
+                       st.caption(f"📊 Dosage: {med['dosage']}")
+               with col2:
+                   if st.button("🗑️", key=f"remove_saved_{med['name']}", help="Remove medication"):
+                       remove_saved_medication(med)
        else:
            st.info("No saved medications yet")
        
-       st.markdown("## 🔍 Recent Searches")
+       # Recent Searches section
+       col1, col2 = st.columns([3, 1])
+       with col1:
+           st.markdown("## 🔍 Recent Searches")
+       with col2:
+           if st.session_state.recent_searches:
+               if st.button("Clear All", key="clear_recent", type="secondary", use_container_width=True):
+                   clear_recent_searches()
+       
        if st.session_state.recent_searches:
-           for search in st.session_state.recent_searches:
-               st.write(f"• {search['medication']}")
-               if search['dosage']:
-                   st.caption(f"📊 Dosage: {search['dosage']}")
-               if search['condition']:
-                   st.caption(f"🏥 For: {search['condition']}")
-               st.caption(f"⏰ {search['timestamp']}")
+           for idx, search in enumerate(st.session_state.recent_searches):
+               col1, col2 = st.columns([4, 1])
+               with col1:
+                   st.write(f"• {search['medication']}")
+                   if search['dosage']:
+                       st.caption(f"📊 Dosage: {search['dosage']}")
+                   if search['condition']:
+                       st.caption(f"🏥 For: {search['condition']}")
+                   st.caption(f"⏰ {search['timestamp']}")
+               with col2:
+                   if st.button("🗑️", key=f"remove_recent_{idx}", help="Remove from history"):
+                       st.session_state.recent_searches.pop(idx)
+                       st.rerun()
        else:
            st.info("No recent searches")
 
@@ -532,13 +617,15 @@ def main():
    st.markdown("# 💊 MediMeal")
    st.markdown("# MediMeal: Smart Prescription & Nutrition Advisor")
   
-   # Search section - Modified to use full-width columns
+   # Search section - Modified to use a single searchable selectbox
    st.markdown("### 🔍 Search Medications")
    
-   search_query = st.text_input(
+   # Create the selectbox with search functionality
+   selected_medication = st.selectbox(
        "Search for medications",
-       placeholder="Enter medication name (e.g., phexx)",
-       key="med_search"
+       options=get_medication_suggestions(""),  # Get all medications initially
+       placeholder="Start typing to search medications...",
+       key="med_select"
    )
    
    condition = st.text_input(
@@ -558,13 +645,13 @@ def main():
    main_col, info_col = st.columns([2, 1])
   
    with main_col:
-       if search_query:
+       if selected_medication:
            # Add to recent searches with dosage
-           add_to_recent_searches(search_query, condition, dosage)
-          
+           add_to_recent_searches(selected_medication, condition, dosage)
+           
            # Search for medications
-           results = search_medications(search_query, condition)
-          
+           results = search_medications(selected_medication, condition)
+           
            if results:
                if condition:
                    matching_results = [r for r in results if r.get('condition_info', {}).get('matches', False)]
