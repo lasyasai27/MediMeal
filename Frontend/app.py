@@ -606,7 +606,14 @@ def main():
    # Add custom CSS for modern dashboard styling
    st.markdown("""
        <style>
-       /* Logo plate styling */
+       /* Logo container styling for single line */
+       .logo-container {
+           display: flex;
+           align-items: center;
+           padding: 10px 0;
+           white-space: nowrap;
+       }
+       
        .logo-plate {
            position: relative;
            width: 45px;
@@ -622,25 +629,51 @@ def main():
            vertical-align: middle;
        }
        
-       .logo-plate::after {
-           content: '';
-           position: absolute;
-           width: 50px;
-           height: 50px;
-           border-radius: 50%;
-           border: 2px solid #e0e0e0;
-           z-index: -1;
+       .logo-text {
+           font-size: 24px;
+           font-weight: 600;
+           color: #2c3e50;
+           display: inline-block;
+           vertical-align: middle;
        }
        
-       .logo-plate .hospital-icon {
-           font-size: 28px;
+       /* Rest of your existing styles... */
+       .sidebar-card {
+           background: white;
+           border-radius: 10px;
+           padding: 15px;
+           margin: 10px 0;
+           box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+           transition: transform 0.2s, box-shadow 0.2s;
+       }
+       
+       .sidebar-card:hover {
+           transform: translateY(-2px);
+           box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+       }
+       
+       .card-icon {
+           font-size: 24px;
+           margin-bottom: 10px;
            color: #2c88b0;
        }
        
-       h1 {
-           font-size: 2.5em;
-           display: flex;
-           align-items: center;
+       .card-title {
+           font-size: 16px;
+           font-weight: 600;
+           color: #2c3e50;
+           margin-bottom: 8px;
+       }
+       
+       .card-description {
+           font-size: 14px;
+           color: #6c757d;
+           line-height: 1.4;
+       }
+       
+       .custom-divider {
+           margin: 20px 0;
+           border-top: 1px solid #eee;
        }
        </style>
    """, unsafe_allow_html=True)
@@ -656,82 +689,47 @@ def main():
        <h2>Smart Prescription & Nutrition Advisor</h2>
    """, unsafe_allow_html=True)
   
-   # Rest of your main code
+   # Sidebar with feature cards only
    with st.sidebar:
-       # Saved Medications section
-       col1, col2 = st.columns([3, 1])
-       with col1:
-           st.markdown("## 📋 Saved Medications")
-       with col2:
-           if st.session_state.saved_medications:
-               if st.button("Clear All", key="clear_saved", type="secondary", use_container_width=True):
-                   st.session_state.saved_medications = []
-                   st.rerun()
-       
-       if st.session_state.saved_medications:
-           for med in st.session_state.saved_medications:
-               col1, col2 = st.columns([4, 1])
-               with col1:
-                   st.write(f"• {med['name']}")
-                   if med.get('dosage'):
-                       st.caption(f"📊 Dosage: {med['dosage']}")
-               with col2:
-                   if st.button("×", key=f"remove_saved_{med['name']}", help="Remove medication"):
-                       remove_saved_medication(med)
-       else:
-           st.info("No saved medications yet")
-       
-       # Recent Searches header and clear button in same line
-       st.markdown(
-           '<div style="display: flex; justify-content: space-between; align-items: center;">'
-           '<span style="font-size: 1.3em; font-weight: bold;">🔍 Recent Searches</span>'
-           '</div>',
-           unsafe_allow_html=True
-       )
-       
-       if st.session_state.get('recent_searches', []):
-           st.button("Clear All", key="clear_recent", type="secondary")
+       # Logo and title in one line
+       st.markdown("""
+           <div style="display: flex; align-items: center; margin-bottom: 20px;">
+               <div class="logo-plate">
+                   <span class="hospital-icon">🏥</span>
+               </div>
+               <span class="logo-text">MediMeal</span>
+           </div>
            
-           for idx, search in enumerate(st.session_state.recent_searches):
-               col1, col2 = st.columns([4, 1])
-               with col1:
-                   st.write(f"• {search['medication']}")
-                   if search.get('dosage'):
-                       st.caption(f"📊 Dosage: {search['dosage']}")
-                   if search.get('condition'):
-                       st.caption(f"🏥 For: {search['condition']}")
-                   st.caption(f"⏰ {search['timestamp']}")
-               with col2:
-                   if st.button("×", key=f"remove_recent_{idx}", help="Remove from history"):
-                       st.session_state.recent_searches.pop(idx)
-                       st.rerun()
-       else:
-           st.info("No recent searches")
-
-       # Add information section to sidebar
-       st.markdown("### ✍️ How it Works")
-       st.markdown("""
-       1. Search for your medication
-       2. View detailed information
-       3. Check for interactions
-       4. Get dietary recommendations
-       """)
+           <div class="custom-divider"></div>
+           
+           <!-- Feature Cards -->
+           <div class="sidebar-card">
+               <div class="card-icon">💊</div>
+               <div class="card-title">Medication Analysis</div>
+               <div class="card-description">
+                   Analyze your medications for interactions and get personalized insights
+               </div>
+           </div>
+           
+           <div class="sidebar-card">
+               <div class="card-icon">🍽️</div>
+               <div class="card-title">Nutrition Recommendations</div>
+               <div class="card-description">
+                   Get dietary suggestions based on your medications and health conditions
+               </div>
+           </div>
+           
+           <div class="sidebar-card">
+               <div class="card-icon">📊</div>
+               <div class="card-title">Health Tracking</div>
+               <div class="card-description">
+                   Monitor your medication schedule and health metrics in one place
+               </div>
+           </div>
+       """, unsafe_allow_html=True)
        
-       st.markdown("### ✨ Features")
-       st.markdown("""
-       - 💰 Find cheaper alternatives
-       - 🌿 Get dietary recommendations
-       - ⚠️ View important interactions
-       - 📊 Track your medications
-       """)
+       st.markdown("<div class='custom-divider'></div>", unsafe_allow_html=True)
        
-       st.markdown("### 💡 Tips")
-       st.markdown("""
-       - Use generic names for better results
-       - Add conditions for targeted results
-       - Save medications for quick access
-       - Check interactions before combining medications
-       """)
 
    # Main content area
    
