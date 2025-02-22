@@ -233,11 +233,12 @@ def display_price_details(price_info: Dict):
        """, unsafe_allow_html=True)
 
 
-def add_to_recent_searches(medication: str, condition: str = None):
+def add_to_recent_searches(medication: str, condition: str = None, dosage: str = None):
    """Add a search to recent searches"""
    search = {
        'medication': medication,
        'condition': condition,
+       'dosage': dosage,
        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
    }
    if search not in st.session_state.recent_searches:
@@ -484,39 +485,73 @@ def main():
        if st.session_state.saved_medications:
            for med in st.session_state.saved_medications:
                st.write(f"• {med['name']}")
+               if med.get('dosage'):
+                   st.caption(f"📊 Dosage: {med['dosage']}")
        else:
            st.info("No saved medications yet")
-      
+       
        st.markdown("## 🔍 Recent Searches")
        if st.session_state.recent_searches:
            for search in st.session_state.recent_searches:
                st.write(f"• {search['medication']}")
+               if search['dosage']:
+                   st.caption(f"📊 Dosage: {search['dosage']}")
                if search['condition']:
-                   st.caption(f"(for {search['condition']})")
-               st.caption(f"Searched on {search['timestamp']}")
+                   st.caption(f"🏥 For: {search['condition']}")
+               st.caption(f"⏰ {search['timestamp']}")
        else:
            st.info("No recent searches")
 
+       # Add information section to sidebar
+       st.markdown("### ✍️ How it Works")
+       st.markdown("""
+       1. Search for your medication
+       2. Select from the suggestions
+       3. View detailed analysis
+       4. Save medications for later
+       """)
+       
+       st.markdown("### ✨ Features")
+       st.markdown("""
+       - 💰 Find cheaper alternatives
+       - 🌿 Get dietary recommendations
+       - ⚠️ View important interactions
+       - 📊 Track your medications
+       """)
+       
+       st.markdown("### 💡 Tips")
+       st.markdown("""
+       - Use generic names for better results
+       - Add conditions for targeted results
+       - Save medications for quick access
+       - Check interactions before combining medications
+       """)
 
    # Main content area
    # Logo and title
    st.markdown("# 💊 MediMeal")
    st.markdown("# MediMeal: Smart Prescription & Nutrition Advisor")
   
-   # Search section
-   col1, col2 = st.columns([2, 1])
-   with col1:
-       search_query = st.text_input(
-           "Search for medications",
-           placeholder="Enter medication name (e.g., phexx)",
-           key="med_search"
-       )
-   with col2:
-       condition = st.text_input(
-           "Medical Condition (Optional)",
-           placeholder="e.g., fever",
-           key="condition_search"
-       )
+   # Search section - Modified to use full-width columns
+   st.markdown("### 🔍 Search Medications")
+   
+   search_query = st.text_input(
+       "Search for medications",
+       placeholder="Enter medication name (e.g., phexx)",
+       key="med_search"
+   )
+   
+   condition = st.text_input(
+       "Medical Condition (Optional)",
+       placeholder="e.g., fever",
+       key="condition_search"
+   )
+   
+   dosage = st.text_input(
+       "Dosage (Optional)",
+       placeholder="e.g., 500mg",
+       key="dosage_input"
+   )
 
 
    # Main content and info columns
@@ -524,8 +559,8 @@ def main():
   
    with main_col:
        if search_query:
-           # Add to recent searches
-           add_to_recent_searches(search_query, condition)
+           # Add to recent searches with dosage
+           add_to_recent_searches(search_query, condition, dosage)
           
            # Search for medications
            results = search_medications(search_query, condition)
@@ -540,10 +575,14 @@ def main():
                    formatted_details = format_medication_details(result)
                   
                    with st.expander(f"{formatted_details['name']}"):
-                       # Save button in top right
-                       col1, col2 = st.columns([4, 1])
-                       with col2:
+                       # Save button and dosage display in top row
+                       col1, col2, col3 = st.columns([3, 2, 1])
+                       with col1:
+                           if dosage:
+                               st.markdown(f"**📊 Dosage:** {dosage}")
+                       with col3:
                            if st.button("Save", key=f"save_{idx}", type="primary"):
+                               result['dosage'] = dosage  # Add dosage to saved medication
                                save_medication(result)
                       
                        # Medication details
@@ -557,31 +596,9 @@ def main():
            else:
                st.info("No medications found. Try a different search term.")
   
-   # Right info column
+   # Right info column removed as content moved to sidebar
    with info_col:
-       st.markdown("### ✍️ How it Works")
-       st.markdown("""
-       1. Search for your medication
-       2. Select from the suggestions
-       3. View detailed analysis
-       4. Save medications for later
-       """)
-      
-       st.markdown("### ✨ Features")
-       st.markdown("""
-       - 💰 Find cheaper alternatives
-       - 🌿 Get dietary recommendations
-       - ⚠️ View important interactions
-       - 📊 Track your medications
-       """)
-      
-       st.markdown("### 💡 Tips")
-       st.markdown("""
-       - Use generic names for better results
-       - Add conditions for targeted results
-       - Save medications for quick access
-       - Check interactions before combining medications
-       """)
+       pass  # Empty column for spacing, or you can remove this section entirely
 
 
 if __name__ == "__main__":
@@ -592,4 +609,3 @@ if __name__ == "__main__":
        st.session_state.recent_searches = []
   
    main()
-
