@@ -243,17 +243,23 @@ def display_price_details(price_info: Dict):
        """, unsafe_allow_html=True)
 
 
-def add_to_recent_searches(medication: str, condition: str = None):
-   """Add a search to recent searches"""
-   search = {
-       'medication': medication,
-       'condition': condition,
-       'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
-   }
-   if search not in st.session_state.recent_searches:
-       st.session_state.recent_searches.insert(0, search)
-       # Keep only last 10 searches
-       st.session_state.recent_searches = st.session_state.recent_searches[:10]
+def add_to_recent_searches(medication: str, condition: str = None, dosage: str = None):
+    """Add a search to recent searches"""
+    if 'recent_searches' not in st.session_state:
+        st.session_state.recent_searches = []
+        
+    search = {
+        'medication': medication,
+        'condition': condition,
+        'dosage': dosage,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
+    }
+    
+    # Add to the beginning of the list
+    st.session_state.recent_searches.insert(0, search)
+    
+    # Keep only the last 10 searches
+    st.session_state.recent_searches = st.session_state.recent_searches[:10]
 
 
 def save_medication(medication: Dict):
@@ -545,6 +551,58 @@ def main():
        </style>
    """, unsafe_allow_html=True)
   
+   # Add custom CSS for styling
+   st.markdown("""
+       <style>
+       /* Existing styles ... */
+
+       /* Clear All button styling */
+       button[kind="secondary"] {
+           background-color: #ff4b4b !important;
+           color: white !important;
+           border: none !important;
+           padding: 2px 8px !important;
+           font-size: 12px !important;
+           border-radius: 4px !important;
+           height: auto !important;
+           min-height: 0 !important;
+           line-height: normal !important;
+           width: auto !important;
+       }
+
+       button[kind="secondary"]:hover {
+           background-color: #ff3333 !important;
+           border: none !important;
+       }
+
+       /* Analyze button style - extended width and centered */
+       div[data-testid="stButton"] > button:first-child {
+           background-color: #ff4b4b !important;
+           color: white !important;
+           border: none !important;
+           padding: 0.5rem 1rem !important;
+           font-size: 1rem !important;
+           border-radius: 4px !important;
+           width: 100% !important;
+           margin: 1rem 0 !important;
+           display: flex !important;
+           justify-content: center !important;
+           align-items: center !important;
+       }
+
+       div[data-testid="stButton"] > button:hover {
+           background-color: #ff3333 !important;
+           border: none !important;
+       }
+
+       /* Container for the analyze button */
+       .analyze-container {
+           padding: 0 !important;
+           margin: 0 !important;
+       }
+       </style>
+   """, unsafe_allow_html=True)
+  
    # Rest of your main code
    with st.sidebar:
        # Saved Medications section
@@ -570,23 +628,24 @@ def main():
        else:
            st.info("No saved medications yet")
        
-       # Recent Searches section
-       col1, col2 = st.columns([3, 1])
-       with col1:
-           st.markdown("## 🔍 Recent Searches")
-       with col2:
-           if st.session_state.recent_searches:
-               if st.button("Clear All", key="clear_recent", type="secondary", use_container_width=True):
-                   clear_recent_searches()
+       # Recent Searches section with styled header and clear button
+       st.markdown(
+           '<div style="display: flex; justify-content: space-between; align-items: center;">'
+           '<span style="font-size: 1.3em; font-weight: bold;">🔍 Recent Searches</span>'
+           '</div>',
+           unsafe_allow_html=True
+       )
        
-       if st.session_state.recent_searches:
+       if st.session_state.get('recent_searches', []):
+           st.button("Clear All", key="clear_recent", type="secondary")
+           
            for idx, search in enumerate(st.session_state.recent_searches):
                col1, col2 = st.columns([4, 1])
                with col1:
                    st.write(f"• {search['medication']}")
-                   if search['dosage']:
+                   if search.get('dosage'):
                        st.caption(f"📊 Dosage: {search['dosage']}")
-                   if search['condition']:
+                   if search.get('condition'):
                        st.caption(f"🏥 For: {search['condition']}")
                    st.caption(f"⏰ {search['timestamp']}")
                with col2:
@@ -626,47 +685,6 @@ def main():
    st.markdown("# 💊 MediMeal")
    st.markdown("## Smart Prescription & Nutrition Advisor")
    
-   # Add custom CSS for styling
-   st.markdown("""
-       <style>
-       /* Button styles */
-       .stButton button[kind="secondary"] {
-           padding: 0.2rem 0.5rem;
-           font-size: 0.7rem;
-       }
-       
-       .stButton > button:nth-child(1) {
-           padding: 0rem;
-           font-size: 0.7rem;
-           line-height: 1;
-           border: none;
-           background: transparent;
-           box-shadow: none;
-       }
-       
-       .stButton > button:hover {
-           border: none;
-           background: transparent;
-           box-shadow: none;
-       }
-
-       /* Analyze button style */
-       div[data-testid="stButton"] > button:first-child {
-           background-color: #ff4b4b;
-           border-color: #ff4b4b;
-           color: white;
-           font-size: 1.1rem;
-           padding: 0.75rem 1.5rem;
-           width: 100%;
-       }
-
-       div[data-testid="stButton"] > button:hover {
-           background-color: #ff3333;
-           border-color: #ff3333;
-       }
-       </style>
-   """, unsafe_allow_html=True)
-
    # Search section
    st.markdown("### 🔍 Search Medications")
    
@@ -675,35 +693,36 @@ def main():
        "Search for medications",
        options=get_medication_suggestions(""),
        placeholder="Start typing to search medications...",
-       key="med_select"
+       key="med_select",
+       label_visibility="collapsed"
    )
-   
-   st.write("")  # Add spacing
    
    condition = st.text_input(
        "Medical Condition (Optional)",
-       placeholder="e.g., fever",
-       key="condition_search"
+       placeholder="Medical Condition (Optional)",
+       key="condition_search",
+       label_visibility="collapsed"
    )
-   
-   st.write("")  # Add spacing
    
    dosage = st.text_input(
        "Dosage (Optional)",
-       placeholder="e.g., 500mg",
-       key="dosage_input"
+       placeholder="Dosage (Optional)",
+       key="dosage_input",
+       label_visibility="collapsed"
    )
    
    # Add spacing before button
    st.write("")
-   st.write("")
    
-   # Red analyze button
+   # Full-width container for analyze button
    analyze_button = st.button("🔍 Analyze Medication", use_container_width=True)
 
    # Main content area
    if selected_medication and analyze_button:
        with st.spinner('Analyzing medication...'):
+           # Add to recent searches when analyzing
+           add_to_recent_searches(selected_medication, condition, dosage)
+           
            results = search_medications(selected_medication, condition)
            if results:
                if condition:
