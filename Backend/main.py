@@ -13,6 +13,7 @@ RXNORM_API_BASE = "https://rxnav.nlm.nih.gov/REST"
 # Data Models
 class MedicationRequest(BaseModel):
     drug_name: str
+    dosage: Optional[str] = None
     condition: Optional[str] = None
     dietary_restrictions: Optional[List[str]] = None
     current_diet: Optional[List[str]] = None
@@ -20,6 +21,7 @@ class MedicationRequest(BaseModel):
 class MedicationInfo(BaseModel):
     name: str
     rxcui: str
+    dosage: Optional[str] = None
     details: Dict  # To store all RxNav API responses
     condition_info: Optional[Dict] = None  # For condition matching
 
@@ -181,6 +183,7 @@ async def analyze_medication(request: MedicationRequest):
         medication_details = MedicationInfo(
             name=basic_info["name"],
             rxcui=basic_info["rxcui"],
+            dosage=request.dosage,
             details=drug_data["details"],
             condition_info={
                 "matches": False,
