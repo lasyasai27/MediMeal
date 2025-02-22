@@ -637,7 +637,7 @@ def main():
            vertical-align: middle;
        }
        
-       /* Rest of your existing styles... */
+       /* Sidebar card styling */
        .sidebar-card {
            background: white;
            border-radius: 10px;
@@ -671,6 +671,7 @@ def main():
            line-height: 1.4;
        }
        
+       /* Divider styling */
        .custom-divider {
            margin: 20px 0;
            border-top: 1px solid #eee;
@@ -691,9 +692,9 @@ def main():
   
    # Sidebar with feature cards only
    with st.sidebar:
-       # Logo and title in one line
+       # Logo and title
        st.markdown("""
-           <div style="display: flex; align-items: center; margin-bottom: 20px;">
+           <div class="logo-container">
                <div class="logo-plate">
                    <span class="hospital-icon">🏥</span>
                </div>
@@ -734,7 +735,7 @@ def main():
    # Main content area
    
    # Search section
-   st.markdown("### 🔍 Search Medications")
+   st.markdown("###  Search Medications")
    
    # Input fields
    selected_medication = st.selectbox(
@@ -763,7 +764,7 @@ def main():
    st.write("")
    
    # Full-width container for analyze button
-   analyze_button = st.button("🔍 Analyze Medication", use_container_width=True)
+   analyze_button = st.button(" Analyze Medication", use_container_width=True)
 
 
    # Main content area
