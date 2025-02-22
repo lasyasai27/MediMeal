@@ -603,6 +603,59 @@ def main():
        </style>
    """, unsafe_allow_html=True)
   
+   # Add custom CSS for modern dashboard styling
+   st.markdown("""
+       <style>
+       /* Logo plate styling */
+       .logo-plate {
+           position: relative;
+           width: 45px;
+           height: 45px;
+           background: white;
+           border-radius: 50%;
+           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+           display: inline-flex;
+           align-items: center;
+           justify-content: center;
+           border: 2px solid #f0f0f0;
+           margin-right: 12px;
+           vertical-align: middle;
+       }
+       
+       .logo-plate::after {
+           content: '';
+           position: absolute;
+           width: 50px;
+           height: 50px;
+           border-radius: 50%;
+           border: 2px solid #e0e0e0;
+           z-index: -1;
+       }
+       
+       .logo-plate .hospital-icon {
+           font-size: 28px;
+           color: #2c88b0;
+       }
+       
+       h1 {
+           font-size: 2.5em;
+           display: flex;
+           align-items: center;
+       }
+       </style>
+   """, unsafe_allow_html=True)
+  
+   # Display header with plate-style logo
+   st.markdown("""
+       <h1>
+           <div class="logo-plate">
+               <span class="hospital-icon">🏥</span>
+           </div>
+           MediMeal
+       </h1>
+       <h2>Smart Prescription & Nutrition Advisor</h2>
+   """, unsafe_allow_html=True)
+  
    # Rest of your main code
    with st.sidebar:
        # Saved Medications section
@@ -628,7 +681,7 @@ def main():
        else:
            st.info("No saved medications yet")
        
-       # Recent Searches section with styled header and clear button
+       # Recent Searches header and clear button in same line
        st.markdown(
            '<div style="display: flex; justify-content: space-between; align-items: center;">'
            '<span style="font-size: 1.3em; font-weight: bold;">🔍 Recent Searches</span>'
@@ -681,9 +734,6 @@ def main():
        """)
 
    # Main content area
-   # Display header first
-   st.markdown("# 💊 MediMeal")
-   st.markdown("## Smart Prescription & Nutrition Advisor")
    
    # Search section
    st.markdown("### 🔍 Search Medications")
@@ -717,6 +767,7 @@ def main():
    # Full-width container for analyze button
    analyze_button = st.button("🔍 Analyze Medication", use_container_width=True)
 
+
    # Main content area
    if selected_medication and analyze_button:
        with st.spinner('Analyzing medication...'):
@@ -740,13 +791,23 @@ def main():
                            st.markdown(f"**Dosage:** {dosage}")
                        if 'form' in results[0]:
                            st.markdown(f"**Form:** {results[0]['form']}")
+                       
+                       # Display active ingredients
                        st.markdown("#### Active Ingredients")
-                       ingredients = results[0].get('ingredients', [])
-                       if ingredients:
-                           for ingredient in ingredients:
-                               st.write(f"• {ingredient}")
-                       else:
-                           st.write("No ingredient information available")
+                       try:
+                           if isinstance(results[0], dict) and 'active_ingredients' in results[0]:
+                               ingredients = results[0]['active_ingredients']
+                               if isinstance(ingredients, list):
+                                   for ingredient in ingredients:
+                                       st.write(f"• {ingredient}")
+                               else:
+                                   st.write(f"• {ingredients}")
+                           else:
+                               st.write("• Active ingredients information not available")
+                       except Exception as e:
+                           st.write("• Active ingredients information not available")
+                           print(f"Error displaying ingredients: {e}")
+                           
                    with col2:
                        if st.button("Save Medication", key="save_primary"):
                            save_medication(results[0])
@@ -762,11 +823,15 @@ def main():
                                    st.markdown(f"**{med.get('name', 'N/A')}**")
                                    if 'form' in med:
                                        st.markdown(f"Form: {med['form']}")
-                                   ingredients = med.get('ingredients', [])
-                                   if ingredients:
+                                   # Display active ingredients for similar medications
+                                   if 'active_ingredients' in med:
                                        st.markdown("Active Ingredients:")
-                                       for ing in ingredients:
-                                           st.write(f"• {ing}")
+                                       ingredients = med['active_ingredients']
+                                       if isinstance(ingredients, list):
+                                           for ing in ingredients:
+                                               st.write(f"• {ing}")
+                                       else:
+                                           st.write(f"• {ingredients}")
                                with col2:
                                    if st.button("Save", key=f"save_similar_{idx}"):
                                        save_medication(med)
@@ -837,7 +902,6 @@ def main():
                    ]
                    for interaction in interactions:
                        st.write(f"• Avoid: {interaction}")
-
            else:
                st.info("No medications found. Try a different search term.")
 
