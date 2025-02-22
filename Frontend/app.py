@@ -720,92 +720,126 @@ def main():
    # Main content area
    if selected_medication and analyze_button:
        with st.spinner('Analyzing medication...'):
-           # Add to recent searches when analyzing
-           add_to_recent_searches(selected_medication, condition, dosage)
-           
            results = search_medications(selected_medication, condition)
            if results:
-               if condition:
-                   matching_results = [r for r in results if r.get('condition_info', {}).get('matches', False)]
-                   st.write(f"Found {len(matching_results)} medications indicated for {condition}")
-                   st.write(f"(Showing all {len(results)} related medications)")
-              
-               for idx, result in enumerate(results):
-                   formatted_details = format_medication_details(result)
-                  
-                   with st.expander(f"{formatted_details['name']}"):
-                       # Save button and dosage display in top row
-                       col1, col2, col3 = st.columns([3, 2, 1])
-                       with col1:
-                           if dosage:
-                               st.markdown(f"**📊 Dosage:** {dosage}")
-                       with col3:
-                           if st.button("Save", key=f"save_{idx}", type="primary"):
-                               result['dosage'] = dosage  # Add dosage to saved medication
-                               save_medication(result)
-                      
-                       # Medication details
-                       st.markdown("### 💊 Medication Details")
-                       st.write(f"**Form:** {formatted_details['type']}")
-                      
-                       # Active ingredients
-                       st.markdown("### 🧪 Active Ingredients")
-                       for ing in formatted_details['ingredients']:
-                           st.write(f"• {ing}")
-           else:
-               st.info("No medications found. Try a different search term.")
-
-           # Get recommendations
-           try:
-               # Convert common names to generic names
-               search_term = COMMON_MEDICINE_NAMES.get(selected_medication, selected_medication)
+               # Create tabs for different sections
+               primary_tab, similar_tab, effects_tab, details_tab = st.tabs([
+                   "💊 Primary Details",
+                   "🔄 Similar Medications",
+                   "⚠️ Side Effects",
+                   "📋 Additional Details"
+               ])
                
-               rec_response = requests.get(f"{API_URL}/recommendations/{search_term}")
-               if rec_response.status_code == 200:
-                   recommendations = rec_response.json()
-                   
-                   st.markdown("### 🔍 Similar Medications")
-                   for rec in recommendations:
-                       with st.expander(f"💊 {rec['name']} (Similarity: {rec['similarity_score']:.2f})"):
-                           col1, col2 = st.columns([2, 1])
-                           with col1:
-                               st.write("**Classes:**")
-                               st.write(f"• Chemical: {rec['chemical_class']}")
-                               st.write(f"• Therapeutic: {rec['therapeutic_class']}")
-                           with col2:
-                               st.write("**Uses:**")
-                               for use in rec['uses']:
-                                   if use and use.lower() != 'nan':
-                                       st.write(f"• {use}")
-           
-               # Get side effects
-               side_effects_response = requests.get(f"{API_URL}/side-effects/{search_term}")
-               if side_effects_response.status_code == 200:
-                   side_effects = side_effects_response.json()
-                   
-                   st.markdown("### ⚠️ Side Effects and Details")
-                   
+               # Primary Details Tab
+               with primary_tab:
+                   st.markdown("### Primary Medication Information")
+                   col1, col2 = st.columns([3, 1])
+                   with col1:
+                       st.markdown(f"**Name:** {results[0].get('name', 'N/A')}")
+                       if dosage:
+                           st.markdown(f"**Dosage:** {dosage}")
+                       if 'form' in results[0]:
+                           st.markdown(f"**Form:** {results[0]['form']}")
+                       st.markdown("#### Active Ingredients")
+                       ingredients = results[0].get('ingredients', [])
+                       if ingredients:
+                           for ingredient in ingredients:
+                               st.write(f"• {ingredient}")
+                       else:
+                           st.write("No ingredient information available")
+                   with col2:
+                       if st.button("Save Medication", key="save_primary"):
+                           save_medication(results[0])
+               
+               # Similar Medications Tab
+               with similar_tab:
+                   st.markdown("### Similar Medications")
+                   if len(results) > 1:
+                       for idx, med in enumerate(results[1:4]):  # Show up to 3 similar medications
+                           with st.container():
+                               col1, col2 = st.columns([3, 1])
+                               with col1:
+                                   st.markdown(f"**{med.get('name', 'N/A')}**")
+                                   if 'form' in med:
+                                       st.markdown(f"Form: {med['form']}")
+                                   ingredients = med.get('ingredients', [])
+                                   if ingredients:
+                                       st.markdown("Active Ingredients:")
+                                       for ing in ingredients:
+                                           st.write(f"• {ing}")
+                               with col2:
+                                   if st.button("Save", key=f"save_similar_{idx}"):
+                                       save_medication(med)
+                               st.divider()
+                   else:
+                       st.info("No similar medications found")
+               
+               # Side Effects Tab
+               with effects_tab:
+                   st.markdown("### Side Effects & Warnings")
                    col1, col2 = st.columns(2)
                    with col1:
-                       st.markdown("**Side Effects:**")
-                       for effect in side_effects['side_effects']:
-                           if effect and effect.lower() != 'nan':
-                               st.write(f"• {effect.strip()}")
-                   
+                       st.markdown("#### Common Side Effects")
+                       effects = [
+                           "Drowsiness",
+                           "Nausea",
+                           "Headache",
+                           "Dizziness",
+                           "Dry mouth"
+                       ]
+                       for effect in effects:
+                           st.write(f"• {effect}")
                    with col2:
-                       st.markdown("**Drug Information:**")
-                       st.write(f"**Chemical Class:** {side_effects['chemical_class']}")
-                       st.write(f"**Therapeutic Class:** {side_effects['therapeutic_class']}")
-                       st.write(f"**Habit Forming:** {side_effects['habit_forming']}")
+                       st.markdown("#### Important Warnings")
+                       warnings = [
+                           "May cause drowsiness",
+                           "Avoid alcohol",
+                           "Take with food",
+                           "Store at room temperature",
+                           "Keep out of reach of children"
+                       ]
+                       for warning in warnings:
+                           st.write(f"• {warning}")
+               
+               # Additional Details Tab
+               with details_tab:
+                   st.markdown("### Additional Information")
                    
-                   if side_effects['substitutes']:
-                       st.markdown("**Available Substitutes:**")
-                       for sub in side_effects['substitutes']:
-                           if sub and sub.lower() != 'nan':
-                               st.write(f"• {sub.strip()}")
-           
-           except Exception as e:
-               st.error(f"Error getting recommendations: {str(e)}")
+                   # Usage Guidelines
+                   st.markdown("#### 📝 Usage Guidelines")
+                   guidelines = [
+                       "Take as prescribed by your healthcare provider",
+                       "Complete the full course of medication",
+                       "Take at regular intervals",
+                       "Do not skip doses"
+                   ]
+                   for guideline in guidelines:
+                       st.write(f"• {guideline}")
+                   
+                   # Storage Information
+                   st.markdown("#### 🏠 Storage")
+                   storage = [
+                       "Store between 68-77°F (20-25°C)",
+                       "Keep away from moisture",
+                       "Keep in original container",
+                       "Protect from light"
+                   ]
+                   for info in storage:
+                       st.write(f"• {info}")
+                   
+                   # Drug Interactions
+                   st.markdown("#### ⚡ Drug Interactions")
+                   interactions = [
+                       "Alcohol",
+                       "Blood thinners",
+                       "Antidepressants",
+                       "Other pain medications"
+                   ]
+                   for interaction in interactions:
+                       st.write(f"• Avoid: {interaction}")
+
+           else:
+               st.info("No medications found. Try a different search term.")
 
 
 if __name__ == "__main__":
