@@ -18,6 +18,48 @@ if 'saved_medications' not in st.session_state:
 if 'recent_searches' not in st.session_state:
    st.session_state.recent_searches = []
 
+# Medication Prices Dictionary
+MEDICATION_PRICES = {
+    "hydrochlorothiazide / losartan": 75.00,
+    "gabapentin": 73.00,
+    "sertraline": 69.00,
+    "levothyroxine": 16.00,
+    "atorvastatin": 140.00,
+    "escitalopram": 531.00,
+    "fluoxetine": 64.00,
+    "pantoprazole": 260.00,
+    "amiloride / hydrochlorothiazide": 7.00,
+    "Prednisone": 7.00,
+    "Tylenol": 10.00,
+    "Advil Migraine": 11.00,
+    "aspirin": 5.00,
+    "amoxicillin": 5.50,
+    "lisinopril": 24.00,
+    "glipizide / metformin": 30.00,
+    "amlodipine": 43.00,
+    "metoprolol": 20.00,
+    "omeprazole": 18.00,
+    "ezetimibe / simvastatin": 120.00,
+    "prednisone": 18.00
+}
+
+def get_medication_price(med_name: str) -> float:
+    """Retrieve medimeprication price from stored prices or external API."""
+    return MEDICATION_PRICES.get(med_name, "Not Available")
+
+def display_medication_details(medication: Dict):
+    """Display primary medication details including price."""
+    st.markdown("### Primary Medication Information")
+    st.markdown(f"**Price:** ${MEDICATION_PRICES.get(med['name'], 'Not Available')}")
+    st.markdown(f"**Price:** ${get_medication_price(medication['name'])}")
+    st.markdown(f"**Name:** {medication['name']}")
+    st.markdown(f"**Price:** ${get_medication_price(medication['name'])}")
+    st.markdown(f"**Condition:** {medication['condition']}")
+    st.markdown(f"**Form:** {medication['form']}")
+    
+    st.markdown("#### Active Ingredients")
+    for ingredient in medication['active_ingredients']:
+        st.write(f"• {ingredient}")
 
 # Add this dictionary at the top of your file
 COMMON_MEDICINE_NAMES = {
@@ -789,17 +831,18 @@ def main():
                        
                        # Primary Details Tab
                        with primary_tab:
-                           med = results[0]
-                           st.markdown("### Primary Medication Information")
-                           st.markdown(f"**Name:** {med['name']}")
-                           st.markdown(f"**Condition:** {med['condition']}")
-                           if dosage:
-                               st.markdown(f"**Dosage:** {dosage}")
-                           st.markdown(f"**Form:** {med['form']}")
-                           
-                           st.markdown("#### Active Ingredients")
-                           for ingredient in med['active_ingredients']:
-                               st.write(f"• {ingredient}")
+                            med = results[0]
+                            st.markdown("### Primary Medication Information")
+                            st.markdown(f"**Name:** {med['name']}")
+                            st.markdown(f"**Price:** ${MEDICATION_PRICES.get(med['name'], 'Not specified')}")  # Get price from MEDICATION_PRICES dictionary
+                            st.markdown(f"**Condition:** {med['condition']}")
+                            if dosage:
+                                st.markdown(f"**Dosage:** {dosage}")
+                            st.markdown(f"**Form:** {med['form']}")
+                            
+                            st.markdown("#### Active Ingredients")
+                            for ingredient in med['active_ingredients']:
+                                st.write(f"• {ingredient}")
                        
                        # Similar Medications Tab
                        with similar_tab:

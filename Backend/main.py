@@ -20,6 +20,20 @@ from ml.preprocess_drugs import preprocess_drug_data
 from ml.drug_recommender import DrugRecommender
 from ml.medicare_drug_analysis import MedicareDrugAnalyzer
 
+medication_prices = {
+    "Losartan": 10.00,
+    "Gabapentin": 15.00,
+    "Sertraline": 8.00,
+    "Levothyroxine": 12.00,
+    "Atorvastatin": 20.00,
+    "Escitalopram": 18.00,
+    "Fluoxetine": 9.00,
+    "Pantoprazole": 14.00,
+    "Hydrochlorothiazide": 11.00,
+    "Prednisone": 7.00,
+}
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -170,6 +184,9 @@ class ModelTrainer:
             results = []
             for idx in indices[0]:
                 med = df.iloc[idx]
+                # Look up the price for the medication
+                price = medication_prices.get(med['drug_name'], None)
+                
                 result = MedicationDetails(
                     name=med['drug_name'],
                     condition=med['medical_condition'],
@@ -193,13 +210,19 @@ class ModelTrainer:
                         'Keep out of reach of children'
                     ]
                 )
-                results.append(result)
+                
+                # Convert to dict to add the price without modifying the interface
+                result_dict = result.dict()
+                result_dict['price'] = price
+                results.append(result_dict)
             
             return results
             
         except Exception as e:
             print(f"Error searching medications: {e}")
             return []
+
+
 
 # Initialize trainer
 trainer = ModelTrainer()
