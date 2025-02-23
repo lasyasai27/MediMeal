@@ -335,12 +335,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 if __name__ == "__main__":
     logger.info("Starting uvicorn server...")
     try:
-        uvicorn.run(
+        uvicorn.run("server:app",
             app,
             host="127.0.0.1",
-            port=8000,
-            log_level="info",
-            reload=True
+            port=3000,
+            log_level="info"
         )
     except Exception as e:
         logger.error(f"Failed to start server: {str(e)}")
