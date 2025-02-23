@@ -1,268 +1,286 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional, Dict
-import requests
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+import logging
+import time
 import uvicorn
-from pricing_service import PricingService
+from typing import Dict
+from pydantic import BaseModel
+from typing import List, Optional
+import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.neighbors import NearestNeighbors
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import requests
+import os
+from nutritional_model import nutritional_model
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MediMeal API")
 
-# RxNorm API base URL
-RXNORM_API_BASE = "https://rxnav.nlm.nih.gov/REST"
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Data Models
-class MedicationRequest(BaseModel):
-    drug_name: str
-    dosage: Optional[str] = None
-    condition: Optional[str] = None
-    dietary_restrictions: Optional[List[str]] = None
-    current_diet: Optional[List[str]] = None
-
-class MedicationInfo(BaseModel):
-    name: str
-    rxcui: str
-    dosage: Optional[str] = None
-    details: Dict  # To store all RxNav API responses
-    condition_info: Optional[Dict] = None  # For condition matching
-
-class DietRecommendation(BaseModel):
-    foods_to_eat: List[str]
-    foods_to_avoid: List[str]
-    meal_timing: str
-    special_instructions: str
-    recipes: List[Dict[str, str]]
-
-class DrugInteraction(BaseModel):
-    severity: str
-    description: str
-    recommendation: str
-
-class AnalysisResponse(BaseModel):
-    medication_details: MedicationInfo
-    alternatives: List[MedicationInfo]
-    diet_recommendations: DietRecommendation
-    interactions: List[DrugInteraction]
-    condition_specific_diet: Optional[Dict[str, List[str]]]
-
-async def get_rxnorm_details(drug_name: str) -> Dict:
-    """Get detailed drug information from RxNorm"""
+# Middleware to log requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    logger.info(f"Starting request: {request.method} {request.url}")
+    
     try:
-        # Search for drug
-        search_url = f"{RXNORM_API_BASE}/drugs?name={drug_name}"
-        response = requests.get(search_url)
-        response.raise_for_status()
-        data = response.json()
-
-        if 'drugGroup' not in data or 'conceptGroup' not in data['drugGroup']:
-            return None
-
-        # Get first matching drug
-        for group in data['drugGroup']['conceptGroup']:
-            if 'conceptProperties' in group:
-                drug = group['conceptProperties'][0]
-                rxcui = drug['rxcui']
-
-                # Get additional details
-                details_url = f"{RXNORM_API_BASE}/rxcui/{rxcui}/allrelated"
-                ingredients_url = f"{RXNORM_API_BASE}/rxcui/{rxcui}/ingredients"
-                
-                details_response = requests.get(details_url)
-                ingredients_response = requests.get(ingredients_url)
-
-                return {
-                    "basic_info": drug,
-                    "details": details_response.json(),
-                    "ingredients": ingredients_response.json()
-                }
-
-        return None
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        logger.info(f"Request completed in {process_time:.2f} seconds")
+        return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Request failed: {str(e)}")
+        raise
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("=== Starting MediMeal API Server ===")
+    logger.info("Initializing server components...")
+    try:
+        # Add any initialization code here
+        logger.info("✓ Server components initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize server: {str(e)}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("=== Shutting down MediMeal API Server ===")
+    # Add any cleanup code here
+
+class MedicationDetails(BaseModel):
+    name: str
+    condition: Optional[str]
+    side_effects: List[str]
+    active_ingredients: List[str]
+    form: Optional[str]
+    interactions: List[str]
+    storage: List[str]
+    guidelines: List[str]
+    warnings: List[str]
+
+class ModelTrainer:
+    def __init__(self):
+        self.data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        self.models = {}
+        
+    def train_all_models(self):
+        print("Training models for available datasets...")
+        self.train_medication_model()
+        self.train_side_effects_model()
+        self.train_interactions_model()
+
+    def train_medication_model(self):
+        try:
+            print("\n1. Training Medication Search Model...")
+            df = pd.read_csv(os.path.join(self.data_dir, 'drugs_side_effects_drugs_com.csv'))
+            
+            text_data = df['drug_name'].fillna('') + ' ' + \
+                       df['medical_condition'].fillna('') + ' ' + \
+                       df['side_effects'].fillna('')
+            
+            vectorizer = TfidfVectorizer(max_features=5000)
+            vectors = vectorizer.fit_transform(text_data)
+            
+            model = NearestNeighbors(n_neighbors=5, metric='cosine')
+            model.fit(vectors)
+            
+            self.models['medication'] = {
+                'vectorizer': vectorizer,
+                'model': model,
+                'data': df
+            }
+            print("✓ Medication Search Model trained")
+            
+        except Exception as e:
+            print(f"Error training medication model: {e}")
+
+    def train_side_effects_model(self):
+        try:
+            print("\n2. Training Side Effects Model...")
+            df = pd.read_csv(os.path.join(self.data_dir, 'drugs_side_effects_drugs_com.csv'))
+            
+            X = df['side_effects'].fillna('')
+            y = df['medical_condition'].fillna('')
+            
+            vectorizer = TfidfVectorizer(max_features=5000)
+            X_vec = vectorizer.fit_transform(X)
+            
+            model = RandomForestClassifier(n_estimators=100)
+            model.fit(X_vec, y)
+            
+            self.models['side_effects'] = {
+                'vectorizer': vectorizer,
+                'model': model
+            }
+            print("✓ Side Effects Model trained")
+            
+        except Exception as e:
+            print(f"Error training side effects model: {e}")
+
+    def train_interactions_model(self):
+        try:
+            print("\n3. Training Drug Interactions Model...")
+            # Add your interactions model training here
+            print("✓ Drug Interactions Model placeholder")
+            
+        except Exception as e:
+            print(f"Error training interactions model: {e}")
+
+    def search_medications(self, query: str, condition: Optional[str] = None) -> List[MedicationDetails]:
+        try:
+            if 'medication' not in self.models:
+                raise ValueError("Medication model not trained")
+            
+            model_dict = self.models['medication']
+            df = model_dict['data']
+            
+            vector = model_dict['vectorizer'].transform([query])
+            _, indices = model_dict['model'].kneighbors(vector)
+            
+            results = []
+            for idx in indices[0]:
+                med = df.iloc[idx]
+                result = MedicationDetails(
+                    name=med['drug_name'],
+                    condition=med['medical_condition'],
+                    side_effects=med['side_effects'].split(',') if isinstance(med['side_effects'], str) else [],
+                    active_ingredients=['Active ingredient information not available'],
+                    form='Tablet',
+                    interactions=['Avoid alcohol', 'Check with your doctor about other medications'],
+                    storage=[
+                        'Store between 68-77°F (20-25°C)',
+                        'Keep away from moisture',
+                        'Keep in original container'
+                    ],
+                    guidelines=[
+                        'Take as prescribed',
+                        'Complete the full course',
+                        'Take at regular intervals'
+                    ],
+                    warnings=[
+                        'May cause drowsiness',
+                        'Take with food',
+                        'Keep out of reach of children'
+                    ]
+                )
+                results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error searching medications: {e}")
+            return []
+
+# Initialize trainer
+trainer = ModelTrainer()
+trainer.train_all_models()
 
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to MediMeal API"}
+async def root():
+    logger.info("Processing root endpoint request")
+    return {
+        "status": "online",
+        "message": "MediMeal API is running",
+        "version": "1.0.0"
+    }
 
-@app.get("/search")
-async def search_medications(query: str, condition: Optional[str] = None):
-    """Search medications with optional condition filtering"""
-    try:
-        # Use RxNav API for drug search
-        url = f"{RXNORM_API_BASE}/drugs.json?name={query}"
-        response = requests.get(url)
-        response.raise_for_status()
-        
-        results = []
-        if 'drugGroup' in response.json() and 'conceptGroup' in response.json()['drugGroup']:
-            for group in response.json()['drugGroup']['conceptGroup']:
-                if 'conceptProperties' in group:
-                    for prop in group['conceptProperties']:
-                        rxcui = prop.get('rxcui')
-                        if rxcui:
-                            # Get additional details
-                            details = await get_drug_details(rxcui)
-                            
-                            # If condition is specified, check indications
-                            if condition:
-                                indication_url = f"{RXNORM_API_BASE}/rxclass/class/byRxcui.json?rxcui={rxcui}"
-                                ind_response = requests.get(indication_url)
-                                
-                                condition_info = {
-                                    'matches': False,
-                                    'indications': []
-                                }
-                                
-                                if ind_response.status_code == 200:
-                                    ind_data = ind_response.json()
-                                    if 'rxclassMinConceptList' in ind_data:
-                                        for concept in ind_data['rxclassMinConceptList']['rxclassMinConcept']:
-                                            class_name = concept.get('className', '').lower()
-                                            condition_info['indications'].append(class_name)
-                                            if condition.lower() in class_name:
-                                                condition_info['matches'] = True
-                                
-                                results.append({
-                                    'name': prop.get('name', ''),
-                                    'rxcui': rxcui,
-                                    'details': details,
-                                    'condition_info': condition_info
-                                })
-                            else:
-                                results.append({
-                                    'name': prop.get('name', ''),
-                                    'rxcui': rxcui,
-                                    'details': details
-                                })
-            
-            # If condition is specified, sort results to show condition-related medications first
-            if condition and results:
-                results.sort(key=lambda x: x.get('condition_info', {}).get('matches', False), reverse=True)
-            
-            return results[:10]  # Limit to 10 results
-        return []
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/health")
+async def health_check() -> Dict:
+    logger.info("Processing health check request")
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "uptime": "available"  # You can add actual uptime calculation here
+    }
 
-async def get_drug_details(rxcui: str) -> Dict:
-    """Get detailed drug information using RxNav API"""
+@app.get("/search/medications")
+async def search_medications(query: str, condition: str = None):
+    logger.info(f"Searching medications with query: {query}, condition: {condition}")
     try:
-        endpoints = {
-            'properties': f"{RXNORM_API_BASE}/rxcui/{rxcui}/properties.json",
-            'ingredients': f"{RXNORM_API_BASE}/rxcui/{rxcui}/related.json?tty=IN",
-            'allrelated': f"{RXNORM_API_BASE}/rxcui/{rxcui}/allrelated.json"
-        }
-        
-        results = {}
-        for key, url in endpoints.items():
-            response = requests.get(url)
-            if response.status_code == 200:
-                results[key] = response.json()
-            else:
-                results[key] = {}
-                
+        results = trainer.search_medications(query, condition)
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error searching medications: {str(e)}")
+        raise
 
-@app.post("/analyze", response_model=AnalysisResponse)
-async def analyze_medication(request: MedicationRequest):
-    """Analyze medication and provide recommendations"""
+@app.get("/medications/{medication_name}/alternatives")
+async def get_alternatives(medication_name: str) -> List[MedicationDetails]:
     try:
-        # Get drug details from RxNorm
-        drug_data = await get_rxnorm_details(request.drug_name)
-        if not drug_data:
-            raise HTTPException(status_code=404, detail="Medication not found")
-
-        # Extract basic medication info
-        basic_info = drug_data["basic_info"]
-        
-        # Get pricing data
-        pricing_data = await PricingService.get_combined_pricing(request.drug_name)
-        
-        # Create medication info
-        medication_details = MedicationInfo(
-            name=basic_info["name"],
-            rxcui=basic_info["rxcui"],
-            dosage=request.dosage,
-            details=drug_data["details"],
-            condition_info={
-                "matches": False,
-                "indications": []
-            }
-        )
-
-        # Get alternatives with pricing
-        alternatives = []
-        if "allRelatedGroup" in drug_data["details"]:
-            for group in drug_data["details"]["allRelatedGroup"].get("conceptGroup", []):
-                if group.get("tty") in ["SBD", "SCD"]:  # Brand and Clinical Drugs
-                    for prop in group.get("conceptProperties", []):
-                        alt_pricing = await PricingService.get_combined_pricing(prop["name"])
-                        alternatives.append(
-                            MedicationInfo(
-                                name=prop["name"],
-                                rxcui=prop["rxcui"],
-                                details=drug_data["details"],
-                                condition_info={
-                                    "matches": False,
-                                    "indications": []
-                                }
-                            )
-                        )
-
-        # Generate diet recommendations
-        diet_rec = DietRecommendation(
-            foods_to_eat=[
-                "Whole grains",
-                "Leafy vegetables",
-                "Lean proteins",
-                "Fresh fruits",
-                "Low-fat dairy"
-            ],
-            foods_to_avoid=[
-                "Grapefruit (may interact with medication)",
-                "High-sodium foods",
-                "Processed sugars",
-                "Alcohol"
-            ],
-            meal_timing="Take medication 1 hour before meals or 2 hours after meals",
-            special_instructions="Stay hydrated and maintain consistent meal times",
-            recipes=[
-                {
-                    "name": "Mediterranean Quinoa Bowl",
-                    "ingredients": "Quinoa, vegetables, olive oil",
-                    "instructions": "Cook quinoa, add vegetables..."
-                }
-            ]
-        )
-
-        # Generate interactions
-        interactions = [
-            DrugInteraction(
-                severity="High",
-                description="Avoid grapefruit juice",
-                recommendation="Do not consume grapefruit or its juice"
-            ),
-            DrugInteraction(
-                severity="Medium",
-                description="Take with food",
-                recommendation="Take medication with meals to reduce stomach upset"
-            )
-        ]
-
-        return AnalysisResponse(
-            medication_details=medication_details,
-            alternatives=alternatives,
-            diet_recommendations=diet_rec,
-            interactions=interactions,
-            condition_specific_diet={
-                "recommended": ["Low-sodium options", "High-fiber foods"],
-                "avoid": ["Processed foods", "Added sugars"]
-            }
-        )
-
+        results = trainer.search_medications(medication_name)
+        return results[1:] if len(results) > 1 else []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise
+
+@app.get("/health/predict")
+async def predict_health_metrics(
+    weight: float,
+    bmi: float,
+    fat_mass: float,
+    muscle_mass: float,
+    visceral_fat: float,
+    metabolism: float,
+    waist: float,
+    hip: float
+):
+    """Predict health metrics based on current measurements"""
+    input_data = {
+        'current_weight_kg': weight,
+        'bmi_kg_m2': bmi,
+        'fat_mass_perc': fat_mass,
+        'muscle_mass_perc': muscle_mass,
+        'visceral_fat_level': visceral_fat,
+        'basal_metabolism': metabolism,
+        'waist_cm': waist,
+        'hip_cm': hip
+    }
+    
+    predictions = nutritional_model.predict_metrics(input_data)
+    return predictions
+
+@app.get("/health/trends/{user_id}")
+async def get_health_trends(user_id: int):
+    """Get health trends for a specific user"""
+    trends = nutritional_model.analyze_trends(user_id)
+    return trends
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global exception handler caught: {str(exc)}")
+    return {
+        "status": "error",
+        "message": str(exc),
+        "path": str(request.url)
+    }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    logger.info("Starting uvicorn server...")
+    try:
+        uvicorn.run(
+            app,
+            host="127.0.0.1",
+            port=8000,
+            log_level="info",
+            reload=True
+        )
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}")

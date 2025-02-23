@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 # Constants
-API_URL = "http://localhost:8000"
+API_URL = "http://127.0.0.1:8000"  # Changed from 8001 to 8000
 RXNORM_API = "https://rxnav.nlm.nih.gov/REST"
 
 
@@ -17,6 +17,16 @@ if 'saved_medications' not in st.session_state:
    st.session_state.saved_medications = []
 if 'recent_searches' not in st.session_state:
    st.session_state.recent_searches = []
+
+
+# Add this dictionary at the top of your file
+COMMON_MEDICINE_NAMES = {
+    "Acetaminophen (Tylenol)": "acetaminophen",
+    "Ibuprofen (Advil)": "ibuprofen", 
+    "Aspirin": "aspirin",
+    "Naproxen (Aleve)": "naproxen",
+    "Diphenhydramine (Benadryl)": "diphenhydramine"
+}
 
 
 def search_condition_medications(condition: str) -> List[str]:
@@ -234,17 +244,22 @@ def display_price_details(price_info: Dict):
 
 
 def add_to_recent_searches(medication: str, condition: str = None, dosage: str = None):
-   """Add a search to recent searches"""
-   search = {
-       'medication': medication,
-       'condition': condition,
-       'dosage': dosage,
-       'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
-   }
-   if search not in st.session_state.recent_searches:
-       st.session_state.recent_searches.insert(0, search)
-       # Keep only last 10 searches
-       st.session_state.recent_searches = st.session_state.recent_searches[:10]
+    """Add a search to recent searches"""
+    if 'recent_searches' not in st.session_state:
+        st.session_state.recent_searches = []
+        
+    search = {
+        'medication': medication,
+        'condition': condition,
+        'dosage': dosage,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
+    }
+    
+    # Add to the beginning of the list
+    st.session_state.recent_searches.insert(0, search)
+    
+    # Keep only the last 10 searches
+    st.session_state.recent_searches = st.session_state.recent_searches[:10]
 
 
 def save_medication(medication: Dict):
@@ -536,162 +551,303 @@ def main():
        </style>
    """, unsafe_allow_html=True)
   
-   # Rest of your main code
-   with st.sidebar:
-       # Saved Medications section
-       col1, col2 = st.columns([3, 1])
-       with col1:
-           st.markdown("## 📋 Saved Medications")
-       with col2:
-           if st.session_state.saved_medications:
-               if st.button("Clear All", key="clear_saved", type="secondary", use_container_width=True):
-                   st.session_state.saved_medications = []
-                   st.rerun()
-       
-       if st.session_state.saved_medications:
-           for med in st.session_state.saved_medications:
-               col1, col2 = st.columns([4, 1])
-               with col1:
-                   st.write(f"• {med['name']}")
-                   if med.get('dosage'):
-                       st.caption(f"📊 Dosage: {med['dosage']}")
-               with col2:
-                   if st.button("🗑️", key=f"remove_saved_{med['name']}", help="Remove medication"):
-                       remove_saved_medication(med)
-       else:
-           st.info("No saved medications yet")
-       
-       # Recent Searches section
-       col1, col2 = st.columns([3, 1])
-       with col1:
-           st.markdown("## 🔍 Recent Searches")
-       with col2:
-           if st.session_state.recent_searches:
-               if st.button("Clear All", key="clear_recent", type="secondary", use_container_width=True):
-                   clear_recent_searches()
-       
-       if st.session_state.recent_searches:
-           for idx, search in enumerate(st.session_state.recent_searches):
-               col1, col2 = st.columns([4, 1])
-               with col1:
-                   st.write(f"• {search['medication']}")
-                   if search['dosage']:
-                       st.caption(f"📊 Dosage: {search['dosage']}")
-                   if search['condition']:
-                       st.caption(f"🏥 For: {search['condition']}")
-                   st.caption(f"⏰ {search['timestamp']}")
-               with col2:
-                   if st.button("🗑️", key=f"remove_recent_{idx}", help="Remove from history"):
-                       st.session_state.recent_searches.pop(idx)
-                       st.rerun()
-       else:
-           st.info("No recent searches")
+   # Add custom CSS for styling
+   st.markdown("""
+       <style>
+       /* Existing styles ... */
 
-       # Add information section to sidebar
-       st.markdown("### ✍️ How it Works")
-       st.markdown("""
-       1. Search for your medication
-       2. Select from the suggestions
-       3. View detailed analysis
-       4. Save medications for later
-       """)
+       /* Clear All button styling */
+       button[kind="secondary"] {
+           background-color: #ff4b4b !important;
+           color: white !important;
+           border: none !important;
+           padding: 2px 8px !important;
+           font-size: 12px !important;
+           border-radius: 4px !important;
+           height: auto !important;
+           min-height: 0 !important;
+           line-height: normal !important;
+           width: auto !important;
+       }
+
+       button[kind="secondary"]:hover {
+           background-color: #ff3333 !important;
+           border: none !important;
+       }
+
+       /* Analyze button style - extended width and centered */
+       div[data-testid="stButton"] > button:first-child {
+           background-color: #ff4b4b !important;
+           color: white !important;
+           border: none !important;
+           padding: 0.5rem 1rem !important;
+           font-size: 1rem !important;
+           border-radius: 4px !important;
+           width: 100% !important;
+           margin: 1rem 0 !important;
+           display: flex !important;
+           justify-content: center !important;
+           align-items: center !important;
+       }
+
+       div[data-testid="stButton"] > button:hover {
+           background-color: #ff3333 !important;
+           border: none !important;
+       }
+
+       /* Container for the analyze button */
+       .analyze-container {
+           padding: 0 !important;
+           margin: 0 !important;
+       }
+       </style>
+   """, unsafe_allow_html=True)
+  
+   # Add custom CSS for modern dashboard styling
+   st.markdown("""
+       <style>
+       /* Logo container styling for single line */
+       .logo-container {
+           display: flex;
+           align-items: center;
+           padding: 10px 0;
+           white-space: nowrap;
+       }
        
-       st.markdown("### ✨ Features")
-       st.markdown("""
-       - 💰 Find cheaper alternatives
-       - 🌿 Get dietary recommendations
-       - ⚠️ View important interactions
-       - 📊 Track your medications
-       """)
+       .logo-plate {
+           position: relative;
+           width: 45px;
+           height: 45px;
+           background: white;
+           border-radius: 50%;
+           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+           display: inline-flex;
+           align-items: center;
+           justify-content: center;
+           border: 2px solid #f0f0f0;
+           margin-right: 12px;
+           vertical-align: middle;
+       }
        
-       st.markdown("### 💡 Tips")
+       .logo-text {
+           font-size: 24px;
+           font-weight: 600;
+           color: #2c3e50;
+           display: inline-block;
+           vertical-align: middle;
+       }
+       
+       /* Sidebar card styling */
+       .sidebar-card {
+           background: white;
+           border-radius: 10px;
+           padding: 15px;
+           margin: 10px 0;
+           box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+           transition: transform 0.2s, box-shadow 0.2s;
+       }
+       
+       .sidebar-card:hover {
+           transform: translateY(-2px);
+           box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+       }
+       
+       .card-icon {
+           font-size: 24px;
+           margin-bottom: 10px;
+           color: #2c88b0;
+       }
+       
+       .card-title {
+           font-size: 16px;
+           font-weight: 600;
+           color: #2c3e50;
+           margin-bottom: 8px;
+       }
+       
+       .card-description {
+           font-size: 14px;
+           color: #6c757d;
+           line-height: 1.4;
+       }
+       
+       /* Divider styling */
+       .custom-divider {
+           margin: 20px 0;
+           border-top: 1px solid #eee;
+       }
+       </style>
+   """, unsafe_allow_html=True)
+  
+   # Display header with plate-style logo
+   st.markdown("""
+       <h1>
+           <div class="logo-plate">
+               <span class="hospital-icon">🏥</span>
+           </div>
+           MediMeal
+       </h1>
+       <h2>Smart Prescription & Nutrition Advisor</h2>
+   """, unsafe_allow_html=True)
+  
+   # Sidebar with feature cards only
+   with st.sidebar:
+       # Logo and title
        st.markdown("""
-       - Use generic names for better results
-       - Add conditions for targeted results
-       - Save medications for quick access
-       - Check interactions before combining medications
-       """)
+           <div class="logo-container">
+               <div class="logo-plate">
+                   <span class="hospital-icon">🏥</span>
+               </div>
+               <span class="logo-text">MediMeal</span>
+           </div>
+           
+           <div class="custom-divider"></div>
+           
+           <!-- Feature Cards -->
+           <div class="sidebar-card">
+               <div class="card-icon">💊</div>
+               <div class="card-title">Medication Analysis</div>
+               <div class="card-description">
+                   Analyze your medications for interactions and get personalized insights
+               </div>
+           </div>
+           
+           <div class="sidebar-card">
+               <div class="card-icon">🍽️</div>
+               <div class="card-title">Nutrition Recommendations</div>
+               <div class="card-description">
+                   Get dietary suggestions based on your medications and health conditions
+               </div>
+           </div>
+           
+           <div class="sidebar-card">
+               <div class="card-icon">📊</div>
+               <div class="card-title">Health Tracking</div>
+               <div class="card-description">
+                   Monitor your medication schedule and health metrics in one place
+               </div>
+           </div>
+       """, unsafe_allow_html=True)
+       
+       st.markdown("<div class='custom-divider'></div>", unsafe_allow_html=True)
+       
 
    # Main content area
-   # Logo and title
-   st.markdown("# 💊 MediMeal")
-   st.markdown("# MediMeal: Smart Prescription & Nutrition Advisor")
-  
+   
    # Search section
-   st.markdown("### 🔍 Search Medications")
+   st.markdown("###  Search Medications")
    
-   # Create two columns for the search inputs
-   col1, col2 = st.columns([2, 1])
+   # Input fields
+   selected_medication = st.selectbox(
+       "Search for medications",
+       options=get_medication_suggestions(""),
+       placeholder="Start typing to search medications...",
+       key="med_select",
+       label_visibility="collapsed"
+   )
    
-   with col1:
-       selected_medication = st.selectbox(
-           "Search for medications",
-           options=get_medication_suggestions(""),
-           placeholder="Start typing to search medications...",
-           key="med_select"
-       )
-       
-       condition = st.text_input(
-           "Medical Condition (Optional)",
-           placeholder="e.g., fever",
-           key="condition_search"
-       )
-       
-       dosage = st.text_input(
-           "Dosage (Optional)",
-           placeholder="e.g., 500mg",
-           key="dosage_input"
-       )
-       
-       # Add analyze button right after inputs
-       analyze_button = st.button("🔍 Analyze Medication", type="primary", use_container_width=True)
+   condition = st.text_input(
+       "Medical Condition (Optional)",
+       placeholder="Medical Condition (Optional)",
+       key="condition_search",
+       label_visibility="collapsed"
+   )
+   
+   dosage = st.text_input(
+       "Dosage (Optional)",
+       placeholder="Dosage (Optional)",
+       key="dosage_input",
+       label_visibility="collapsed"
+   )
+   
+   # Add spacing before button
+   st.write("")
+   
+   # Full-width container for analyze button
+   analyze_button = st.button(" Analyze Medication", use_container_width=True)
 
-   # Main content and info columns
-   main_col, info_col = st.columns([2, 1])
-  
-   with main_col:
-       if selected_medication and analyze_button:
-           with st.spinner('Analyzing medication...'):
-               # Add to recent searches with dosage
-               add_to_recent_searches(selected_medication, condition, dosage)
+
+   # Main content area
+   if selected_medication and analyze_button:
+       with st.spinner('Analyzing medication...'):
+           try:
+               response = requests.get(f"{API_URL}/search/medications", params={
+                   "query": selected_medication,
+                   "condition": condition
+               })
                
-               # Search for medications
-               results = search_medications(selected_medication, condition)
-               
-               if results:
-                   if condition:
-                       matching_results = [r for r in results if r.get('condition_info', {}).get('matches', False)]
-                       st.write(f"Found {len(matching_results)} medications indicated for {condition}")
-                       st.write(f"(Showing all {len(results)} related medications)")
-                  
-                   for idx, result in enumerate(results):
-                       formatted_details = format_medication_details(result)
-                      
-                       with st.expander(f"{formatted_details['name']}"):
-                           # Save button and dosage display in top row
-                           col1, col2, col3 = st.columns([3, 2, 1])
+               if response.status_code == 200:
+                   results = response.json()
+                   if results:
+                       # Create tabs for different sections
+                       primary_tab, similar_tab, effects_tab, details_tab = st.tabs([
+                           "💊 Primary Details",
+                           "🔄 Similar Medications",
+                           "⚠️ Side Effects",
+                           "📋 Additional Details"
+                       ])
+                       
+                       # Primary Details Tab
+                       with primary_tab:
+                           med = results[0]
+                           st.markdown("### Primary Medication Information")
+                           st.markdown(f"**Name:** {med['name']}")
+                           st.markdown(f"**Condition:** {med['condition']}")
+                           if dosage:
+                               st.markdown(f"**Dosage:** {dosage}")
+                           st.markdown(f"**Form:** {med['form']}")
+                           
+                           st.markdown("#### Active Ingredients")
+                           for ingredient in med['active_ingredients']:
+                               st.write(f"• {ingredient}")
+                       
+                       # Similar Medications Tab
+                       with similar_tab:
+                           st.markdown("### Similar Medications")
+                           alternatives_response = requests.get(f"{API_URL}/medications/{selected_medication}/alternatives")
+                           if alternatives_response.status_code == 200:
+                               alternatives = alternatives_response.json()
+                               for alt in alternatives:
+                                   st.markdown(f"**{alt['name']}**")
+                                   st.markdown(f"Form: {alt['form']}")
+                                   st.markdown("Active Ingredients:")
+                                   for ing in alt['active_ingredients']:
+                                       st.write(f"• {ing}")
+                                   st.divider()
+                       
+                       # Side Effects Tab
+                       with effects_tab:
+                           st.markdown("### Side Effects & Warnings")
+                           col1, col2 = st.columns(2)
                            with col1:
-                               if dosage:
-                                   st.markdown(f"**📊 Dosage:** {dosage}")
-                           with col3:
-                               if st.button("Save", key=f"save_{idx}", type="primary"):
-                                   result['dosage'] = dosage  # Add dosage to saved medication
-                                   save_medication(result)
-                          
-                           # Medication details
-                           st.markdown("### 💊 Medication Details")
-                           st.write(f"**Form:** {formatted_details['type']}")
-                          
-                           # Active ingredients
-                           st.markdown("### 🧪 Active Ingredients")
-                           for ing in formatted_details['ingredients']:
-                               st.write(f"• {ing}")
+                               st.markdown("#### Side Effects")
+                               for effect in med['side_effects']:
+                                   st.write(f"• {effect}")
+                           with col2:
+                               st.markdown("#### Warnings")
+                               for warning in med['warnings']:
+                                   st.write(f"• {warning}")
+                       
+                       # Additional Details Tab
+                       with details_tab:
+                           st.markdown("### Additional Information")
+                           
+                           st.markdown("#### 📝 Usage Guidelines")
+                           for guideline in med['guidelines']:
+                               st.write(f"• {guideline}")
+                           
+                           st.markdown("#### 🏠 Storage")
+                           for storage in med['storage']:
+                               st.write(f"• {storage}")
+                           
+                           st.markdown("#### ⚡ Drug Interactions")
+                           for interaction in med['interactions']:
+                               st.write(f"• {interaction}")
+                   
                else:
-                   st.info("No medications found. Try a different search term.")
-  
-   # Right info column removed as content moved to sidebar
-   with info_col:
-       pass  # Empty column for spacing, or you can remove this section entirely
+                   st.error("Error connecting to the medication service")
+           except Exception as e:
+               st.error(f"Error: {str(e)}")
 
 
 if __name__ == "__main__":
