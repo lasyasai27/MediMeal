@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import time
@@ -16,6 +16,9 @@ from sklearn.metrics import accuracy_score
 import requests
 import os
 from nutritional_model import nutritional_model
+from ml.preprocess_drugs import preprocess_drug_data
+from ml.drug_recommender import DrugRecommender
+from ml.medicare_drug_analysis import MedicareDrugAnalyzer
 
 # Configure logging
 logging.basicConfig(
@@ -58,6 +61,13 @@ async def startup_event():
     try:
         # Add any initialization code here
         logger.info("✓ Server components initialized successfully")
+        # Initialize the analyzer when the server starts
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        data_path = os.path.join(current_dir, 'data', 'DSD_PTD_RY24_P04_V10_DY22_BGM.csv')
+        
+        analyzer = MedicareDrugAnalyzer()
+        analyzer.train_model(data_path)
+        logger.info("Medicare Drug Analyzer initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize server: {str(e)}")
         raise
@@ -195,6 +205,25 @@ class ModelTrainer:
 trainer = ModelTrainer()
 trainer.train_all_models()
 
+# Initialize the drug recommender
+try:
+    df, label_encoder = preprocess_drug_data()
+    drug_recommender = DrugRecommender(df)
+    logger.info("Successfully initialized drug recommender")
+except Exception as e:
+    logger.error(f"Failed to initialize drug recommender: {str(e)}")
+    # Initialize with empty dataframe as fallback
+    df = pd.DataFrame()
+    drug_recommender = None
+
+# Define the DrugFeatures class first
+class DrugFeatures(BaseModel):
+    total_claims: float
+    total_beneficiaries: float
+    total_dosage_units: float
+    avg_spending_per_claim: float
+    avg_spending_per_beneficiary: float
+
 @app.get("/")
 async def root():
     logger.info("Processing root endpoint request")
@@ -262,6 +291,37 @@ async def get_health_trends(user_id: int):
     """Get health trends for a specific user"""
     trends = nutritional_model.analyze_trends(user_id)
     return trends
+
+@app.get("/api/drug-recommendations/{drug_name}")
+async def get_drug_recommendations(drug_name: str):
+    if drug_recommender is None:
+        return {
+            "status": "error",
+            "message": "Drug recommender not initialized"
+        }
+    try:
+        recommendations = drug_recommender.get_recommendations(drug_name)
+        return {
+            "status": "success",
+            "recommendations": recommendations.to_dict('records')
+        }
+    except Exception as e:
+        logger.error(f"Error getting drug recommendations: {str(e)}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@app.post("/api/predict-spending")
+async def predict_spending(features: DrugFeatures):
+    try:
+        result = analyzer.predict_spending(features.dict())
+        if result['status'] == 'error':
+            raise HTTPException(status_code=400, detail=result['error'])
+        return result
+    except Exception as e:
+        logger.error(f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
