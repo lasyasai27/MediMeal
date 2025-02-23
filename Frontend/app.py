@@ -5,7 +5,24 @@ import plotly.express as px
 import plotly.graph_objects as go
 from typing import Dict, List
 from datetime import datetime
+import os
+import sys
+from main import get_medication_prices  # Ensure main.py is in the same directory or adjust the path accordingly
+# Add the parent directory to the system path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+st.title("Medication Price Finder")
 
+# Input widget for medication name
+medication = st.text_input("Enter medication name:")
+
+if medication:
+    # Retrieve the pricing data using the backend function from main.py
+    prices_df = get_medication_prices(medication)
+    if not prices_df.empty:
+        st.write(f"Prices for {medication}:")
+        st.dataframe(prices_df)
+    else:
+        st.write(f"No pricing data found for {medication}.")
 
 # Constants
 API_URL = "http://127.0.0.1:8000"  # Changed from 8001 to 8000

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, BaseSettings
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 from typing import Dict, List, Optional
 import logging
 import time
@@ -29,6 +30,19 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+# Load settings and construct the full path for the CSV file
+settings = get_settings()
+data_file_path = os.path.join(settings.DATA_DIR, "nadac-national-average-drug-acquisition-cost-12-25-2024.csv")
+df_prices = pd.read_csv(data_file_path)
+
+def get_medication_prices(medication_name):
+    """
+    Returns a DataFrame filtered for a given medication name.
+    Adjust column names to match your CSV file.
+    """
+    filtered = df_prices[df_prices['medication'].str.lower() == medication_name.lower()]
+    return filtered[['provider', 'price']]
 
 # =====================================
 # Logging Configuration
@@ -89,8 +103,8 @@ class MedicationService:
             
             # Prepare text data for vectorization
             text_data = df['drug_name'].fillna('') + ' ' + \
-                       df['medical_condition'].fillna('') + ' ' + \
-                       df['side_effects'].fillna('')
+                        df['medical_condition'].fillna('') + ' ' + \
+                        df['side_effects'].fillna('')
             
             # Initialize and fit vectorizer
             self.vectorizer = TfidfVectorizer(max_features=5000)
