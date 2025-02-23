@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 # Constants
-API_URL = "http://127.0.0.1:3000"  # Changed from 8001 to 8000
+API_URL = "http://127.0.0.1:8000"  # Changed from 8001 to 8000
 RXNORM_API = "https://rxnav.nlm.nih.gov/REST"
 
 
