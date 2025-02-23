@@ -43,6 +43,51 @@ MEDICATION_PRICES = {
     "prednisone": 18.00
 }
 
+MEDICATION_INGREDIENTS = {
+    "hydrochlorothiazide / losartan": ["Hydrochlorothiazide", "Losartan Potassium"],
+    "gabapentin": ["Gabapentin"],
+    "sertraline": ["Sertraline Hydrochloride"],
+    "levothyroxine": ["Levothyroxine Sodium"],
+    "atorvastatin": ["Atorvastatin Calcium"],
+    "escitalopram": ["Escitalopram Oxalate"],
+    "fluoxetine": ["Fluoxetine Hydrochloride"],
+    "pantoprazole": ["Pantoprazole Sodium"],
+    "Tylenol": ["Acetaminophen"],
+    "Advil Migraine": ["Ibuprofen", "Potassium Salt"],
+    "aspirin": ["Acetylsalicylic Acid"],
+    "amoxicillin": ["Amoxicillin Trihydrate"],
+    "lisinopril": ["Lisinopril Dihydrate"],
+    "amlodipine": ["Amlodipine Besylate"],
+    "metoprolol": ["Metoprolol Tartrate"],
+    "omeprazole": ["Omeprazole Magnesium"],
+    "simvastatin": ["Simvastatin"],
+    "prednisone": ["Prednisone"]
+}
+
+# Add this new dictionary at the top of your file with other constants
+MEDICATION_SUCCESS_RATES = {
+    "Tylenol": 85,
+    "aspirin": 82,
+    "Advil Migraine": 80,
+    "amoxicillin": 88,
+    "lisinopril": 75,
+    "glipizide / metformin": 78,
+    "amlodipine": 82,
+    "metoprolol": 79,
+    "ezetimibe / simvastatin": 77,
+    "hydrochlorothiazide / losartan": 81,
+    "omeprazole": 84,
+    "Losartan": 76,
+    "gabapentin": 73,
+    "sertraline": 70,
+    "levothyroxine": 85,
+    "atorvastatin": 82,
+    "escitalopram": 71,
+    "fluoxetine": 69,
+    "pantoprazole": 83,
+    "prednisone": 75
+}
+
 def get_medication_price(med_name: str) -> float:
     """Retrieve medimeprication price from stored prices or external API."""
     return MEDICATION_PRICES.get(med_name, "Not Available")
@@ -734,6 +779,9 @@ def main():
   
    # Sidebar with feature cards only
    with st.sidebar:
+       
+       st.markdown("<div class='custom-divider'></div>", unsafe_allow_html=True)
+
        # Logo and title
        st.markdown("""
            <div class="logo-container">
@@ -744,13 +792,14 @@ def main():
            </div>
            
            <div class="custom-divider"></div>
+            
            
            <!-- Feature Cards -->
            <div class="sidebar-card">
                <div class="card-icon">💊</div>
                <div class="card-title">Medication Analysis</div>
                <div class="card-description">
-                   Analyze your medications for interactions and get personalized insights
+                   Offers an detailed interactive interface to learn more about your medication.
                </div>
            </div>
            
@@ -758,7 +807,7 @@ def main():
                <div class="card-icon">🍽️</div>
                <div class="card-title">Nutrition Recommendations</div>
                <div class="card-description">
-                   Get dietary suggestions based on your medications and health conditions
+                   Gives you an overview of what foods to eat and avoid while taking the medication.
                </div>
            </div>
            
@@ -766,13 +815,56 @@ def main():
                <div class="card-icon">📊</div>
                <div class="card-title">Health Tracking</div>
                <div class="card-description">
-                   Monitor your medication schedule and health metrics in one place
+                   Creates a graph that visualizes the success rate of the medication.
                </div>
            </div>
        """, unsafe_allow_html=True)
        
        st.markdown("<div class='custom-divider'></div>", unsafe_allow_html=True)
-       
+
+       # Recent Searches section
+       col1, col2 = st.columns([3, 1])
+       with col1:
+           st.markdown("#### 📜 Recent Searches")
+       with col2:
+           if st.button("🗑️", key="clear_recent", help="Clear all recent searches"):
+            clear_recent_searches()
+    
+       if st.session_state.recent_searches:
+           for idx, search in enumerate(st.session_state.recent_searches):
+            # Create a clickable button with custom styling
+            button_label = (
+                f"{search['medication']}\n"
+                f"Condition: {search.get('condition', 'Not specified')}\n"
+                f"Dosage: {search.get('dosage', 'Not specified')}"
+            )
+            if st.button(
+                button_label,
+                key=f"recent_search_{idx}",
+                help="Click to analyze this medication",
+                use_container_width=True
+            ):
+                st.session_state.med_select = search['medication']
+                st.rerun()
+                st.session_state.med_select = search['medication']
+                st.rerun()
+            
+            # Add timestamp with better styling
+            st.markdown(
+                f"""
+                <div style='font-size: 0.8em; color: #666; margin-bottom: 8px; padding-left: 4px;'>
+                    {search['timestamp']}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            # Add a subtle divider between entries
+            if idx < len(st.session_state.recent_searches) - 1:
+                st.markdown("<hr style='margin: 5px 0; opacity: 0.2;'>", unsafe_allow_html=True)
+       else:
+           st.markdown("*No recent searches*")
+      
 
    # Main content area
    
@@ -786,7 +878,7 @@ def main():
        placeholder="Start typing to search medications...",
        key="med_select",
        label_visibility="collapsed"
-   )
+    )
    
    condition = st.text_input(
        "Medical Condition (Optional)",
@@ -811,6 +903,9 @@ def main():
 
    # Main content area
    if selected_medication and analyze_button:
+       # Add this line before the spinner
+       add_to_recent_searches(selected_medication, condition, dosage)
+    
        with st.spinner('Analyzing medication...'):
            try:
                response = requests.get(f"{API_URL}/search/medications", params={
@@ -822,11 +917,14 @@ def main():
                    results = response.json()
                    if results:
                        # Create tabs for different sections
-                       primary_tab, similar_tab, effects_tab, details_tab = st.tabs([
+                       primary_tab, similar_tab, effects_tab, details_tab, food_tab, avoid_med_tab, success_rate_tab = st.tabs([
                            "💊 Primary Details",
                            "🔄 Similar Medications",
                            "⚠️ Side Effects",
-                           "📋 Additional Details"
+                           "📋 Additional Details",
+                           "🍽️ Food Suggestions",  # New food suggestions tab
+                           "🚫 Avoid Medications",  # New avoid medications tab
+                            "📊 Success Rate"  # New tab
                        ])
                        
                        # Primary Details Tab
@@ -841,7 +939,8 @@ def main():
                             st.markdown(f"**Form:** {med['form']}")
                             
                             st.markdown("#### Active Ingredients")
-                            for ingredient in med['active_ingredients']:
+                            ingredients = MEDICATION_INGREDIENTS.get(med['name'], ["Information not available"])
+                            for ingredient in ingredients:
                                 st.write(f"• {ingredient}")
                        
                        # Similar Medications Tab
@@ -853,9 +952,6 @@ def main():
                                for alt in alternatives:
                                    st.markdown(f"**{alt['name']}**")
                                    st.markdown(f"Form: {alt['form']}")
-                                   st.markdown("Active Ingredients:")
-                                   for ing in alt['active_ingredients']:
-                                       st.write(f"• {ing}")
                                    st.divider()
                        
                        # Side Effects Tab
@@ -886,7 +982,427 @@ def main():
                            st.markdown("#### ⚡ Drug Interactions")
                            for interaction in med['interactions']:
                                st.write(f"• {interaction}")
-                   
+                       # food suggestions tab
+                       with food_tab:
+                           st.markdown("### Food Recommendations")
+                           col1, col2 = st.columns(2)
+
+                           with col1:
+                            st.markdown("#### ✅ Foods to Include")
+                            recommended_foods = {
+                                "Tylenol": ["Water-rich foods", "Light, easily digestible foods"], "aspirin": ["Foods rich in vitamin K", "Green leafy vegetables", "Yogurt", "Bananas", 
+                "Oatmeal", "Rice", "Low-acid fruits", "Whole grain bread"], "Advil Migraine": ["Yogurt", "Bananas", "Rice"],
+                                "amoxicillin": ["Probiotic-rich foods", "Yogurt", "Fermented foods"],
+                                "lisinopril": ["Low-sodium foods", "Fruits", "Vegetables"],
+                                "glipizide / metformin": ["High-fiber foods", "Lean proteins", "Green vegetables"],
+                                 "amlodipine": ["Low-sodium foods", "Potassium-rich foods (bananas, sweet potatoes)","Magnesium-rich foods (leafy greens, nuts)","Fresh fruits and vegetables", "Lean proteins","Whole grains", "Fish rich in omega-3", "Low-fat dairy products"],
+                                 "metoprolol": [
+        "Low-sodium foods",
+        "Potassium-rich foods (bananas, sweet potatoes, spinach)",
+        "Magnesium-rich foods (nuts, seeds, leafy greens)",
+        "Fresh fruits and vegetables",
+        "Whole grains",
+        "Lean proteins",
+        "Fish rich in omega-3",
+        "Low-fat dairy products"
+    ], "ezetimibe / simvastatin": [
+        "Heart-healthy foods",
+        "High-fiber foods (oats, whole grains)",
+        "Fatty fish rich in omega-3 (salmon, mackerel)",
+        "Nuts and seeds",
+        "Olive oil and other healthy oils",
+        "Fresh fruits and vegetables",
+        "Lean proteins",
+        "Plant-based proteins (legumes, beans)",
+        "Low-fat dairy products"
+    ], "hydrochlorothiazide / losartan": [
+        "Low-sodium foods",
+        "Foods rich in potassium (sweet potatoes, bananas)",
+        "Foods high in magnesium (leafy greens, nuts)",
+        "Fresh fruits and vegetables",
+        "Lean proteins (chicken, fish)",
+        "Whole grains",
+        "Berries",
+        "Low-fat dairy products",
+        "Foods rich in fiber"
+    ],
+                                "omeprazole": ["Non-acidic fruits", "Lean proteins", "Whole grains"],"Losartan": ["Low-sodium foods", "Bananas", "Leafy greens", "Sweet potatoes", "Greek yogurt"],
+                                "gabapentin": ["High-protein foods", "Complex carbohydrates", "Fiber-rich foods", "Leafy vegetables"],
+                                "sertraline": ["Foods rich in B-vitamins", "Whole grains", "Lean proteins", "Omega-3 rich foods"],
+                                "levothyroxine": ["Iodine-rich foods", "Selenium-rich foods", "Brazil nuts", "Fish", "Eggs"],
+                                "atorvastatin": ["Heart-healthy foods", "Oatmeal", "Fatty fish", "Nuts", "Olive oil"],
+                                "escitalopram": ["Foods rich in B12", "Leafy greens", "Whole grains", "Lean proteins", "Berries"],
+                                "fluoxetine": ["Complex carbohydrates", "Protein-rich foods", "Fresh fruits", "Vegetables"],
+                                "pantoprazole": ["Non-acidic fruits", "Low-fat proteins", "Cooked vegetables", "Whole grains"],
+                                "amiloride / hydrochlorothiazide": ["Potassium-rich foods", "Bananas", "Sweet potatoes", "Yogurt", "Leafy greens"],
+                                "prednisone": ["Calcium-rich foods", "Vitamin D foods", "Lean proteins", "Low-sodium foods"]
+                            }
+        
+                            foods_to_include = recommended_foods.get(med['name'], ["Information not available"])
+                            for food in foods_to_include:
+                                st.write(f"• {food}")
+
+                       with col2:
+                           st.markdown("#### ❌ Foods to Avoid")
+                           avoid_foods = {"Tylenol": ["Alcohol", "Excessive caffeine"],"aspirin": ["Spicy foods", "Citrus fruits", "Tomatoes", "Coffee", "Tea", 
+                "Carbonated drinks", "Alcohol", "Vinegar-based foods", "High-acid foods"],
+                                        "Advil Migraine": ["Spicy foods", "Acidic foods", "Alcohol"],
+                                        "amoxicillin": ["Alcohol", "High-sugar foods"],
+                                        "lisinopril": ["High-salt foods", "Alcohol", "Potassium supplements"],
+                                        "glipizide / metformin": ["Excessive carbohydrates", "Alcohol", "High-sugar foods"],
+                                        "amlodipine": ["High-sodium foods",
+                   "Grapefruit and grapefruit juice",
+                   "Excessive alcohol",
+                   "High-fat foods",
+                   "Foods high in saturated fats",
+                   "Processed foods",
+                   "Excessive caffeine",
+                   "Large amounts of black licorice"],
+                                            "metoprolol": [
+        "High-sodium foods",
+        "Excessive caffeine",
+        "Alcohol",
+        "Foods high in tyramine (aged cheeses, cured meats)",
+        "Large amounts of licorice",
+        "Foods high in saturated fats",
+        "Processed foods with high sodium content",
+        "Energy drinks"
+    ], "ezetimibe / simvastatin": [
+        "Heart-healthy foods",
+        "High-fiber foods (oats, whole grains)",
+        "Fatty fish rich in omega-3 (salmon, mackerel)",
+        "Nuts and seeds",
+        "Olive oil and other healthy oils",
+        "Fresh fruits and vegetables",
+        "Lean proteins",
+        "Plant-based proteins (legumes, beans)",
+        "Low-fat dairy products"
+    ],"hydrochlorothiazide / losartan": [
+        "High-sodium foods",
+        "Salt substitutes (high in potassium)",
+        "Excessive potassium supplements",
+        "Alcohol",
+        "Licorice",
+        "Processed foods",
+        "Foods high in saturated fats",
+        "Caffeine in large amounts",
+        "Grapefruit and grapefruit juice"
+    ],
+                                        "omeprazole": ["Spicy foods", "Citrus fruits", "Tomato-based foods"], "Losartan": ["High-sodium foods", "Salt substitutes", "Excessive potassium supplements"],
+                                        "gabapentin": ["Alcohol", "Caffeine", "High-fat foods"],
+                                        "sertraline": ["Alcohol", "Grapefruit", "High-tyramine foods", "Aged cheeses"],
+                                        "levothyroxine": ["Soy products", "High-fiber foods", "Coffee", "Walnuts", "Iron-rich foods"],
+                                        "atorvastatin": ["Grapefruit", "Excessive alcohol", "High-fat foods"],
+                                        "escitalopram": ["Alcohol", "Grapefruit", "Caffeine", "High-tyramine foods"],
+                                        "fluoxetine": ["Alcohol", "Grapefruit", "Excessive caffeine", "High-tyramine foods"],
+                                        "pantoprazole": ["Spicy foods", "Citrus fruits", "Tomatoes", "Coffee", "Alcohol"],
+                                        "amiloride / hydrochlorothiazide": ["High-sodium foods", "Alcohol", "Licorice"],
+                                        "prednisone": ["High-sodium foods", "High-sugar foods", "Alcohol", "Caffeine"]
+                           }
+        
+                           foods_to_avoid = avoid_foods.get(med['name'], ["Information not available"])
+                           for food in foods_to_avoid:
+                            st.write(f"• {food}")
+
+                        # Add this after the food_tab section
+                       with avoid_med_tab:
+                           st.markdown("### ⛔ Medications to Avoid")
+                           medications_to_avoid = {
+                            "Tylenol": [
+                                "Other acetaminophen-containing products",
+                                "High doses of NSAIDs",
+                                "Certain antibiotics",
+                                "Warfarin",
+                                "Alcohol-containing medications"
+                            ],
+                            "aspirin": [
+                                "Other NSAIDs (ibuprofen, naproxen)",
+                                "Blood thinners (warfarin)",
+                                "High blood pressure medications",
+                                "Methotrexate"
+                            ],
+                            "Advil Migraine": [
+                                "Other NSAIDs (ibuprofen, naproxen)",
+                                "Aspirin",
+                                "Blood thinners",
+                                "High blood pressure medications",
+                                "Medications that can irritate the stomach"
+                            ],
+                            "glipizide / metformin": [
+                                "High doses of corticosteroids",
+                                "Thiazide diuretics",
+                                "Beta blockers",
+                                "Calcium channel blockers",
+                                "Medications that affect blood sugar"
+                            ],
+                            "omeprazole": [
+                                "Atazanavir",
+                                "Nelfinavir",
+                                "Cilostazol",
+                                "Clopidogrel",
+                                "Iron supplements (timing separation needed)",
+                                "Certain antifungal medications"
+                            ],
+                            "amiloride / hydrochlorothiazide": [
+                                "Other potassium-sparing diuretics",
+                                "ACE inhibitors",
+                                "ARBs",
+                                "Lithium",
+                                "NSAIDs",
+                                "Potassium supplements"
+                            ],
+                            "amoxicillin": [
+                                "Probenecid",
+                                "Allopurinol",
+                                "Oral contraceptives",
+                                "Other antibiotics (tetracyclines)"
+                            ],
+                            "lisinopril": [
+                                "Potassium supplements",
+                                "Other ACE inhibitors",
+                                "NSAIDs",
+                                "Lithium"
+                            ],
+                            "metoprolol": [
+                                "Other beta blockers",
+                                "Calcium channel blockers",
+                                "Antiarrhythmic medications",
+                                "MAO inhibitors"
+                            ],
+                            "amlodipine": [
+                                "Simvastatin (high doses)",
+                                "Other calcium channel blockers",
+                                "Beta blockers",
+                                "CYP3A4 inhibitors"
+                            ],
+                            "ezetimibe / simvastatin": [
+                                "Other statins",
+                                "Fibrates",
+                                "Cyclosporine",
+                                "Strong CYP3A4 inhibitors"
+                            ],
+                            "hydrochlorothiazide / losartan": [
+                                "Other ARBs",
+                                "ACE inhibitors",
+                                "Potassium-sparing diuretics",
+                                "Lithium",
+                                "NSAIDs"
+                            ],
+                            "gabapentin": [
+                                "Opioids",
+                                "Other CNS depressants",
+                                "Antacids (timing separation needed)",
+                                "Morphine"
+                            ],
+                            "sertraline": [
+                                "Other SSRIs",
+                                "MAO inhibitors",
+                                "Pimozide",
+                                "NSAIDs",
+                                "Warfarin"
+                            ],
+                            "levothyroxine": [
+                                "Calcium supplements",
+                                "Iron supplements",
+                                "Antacids",
+                                "Cholesterol-lowering drugs",
+                                "Anticoagulants"
+                            ],
+                            "atorvastatin": [
+                                "Other statins",
+                                "Fibrates",
+                                "Cyclosporine",
+                                "Strong CYP3A4 inhibitors"
+                            ],
+                            "escitalopram": [
+                                "Other SSRIs",
+                                "MAO inhibitors",
+                                "Pimozide",
+                                "NSAIDs",
+                                "Aspirin"
+                            ],
+                            "fluoxetine": [
+                                "Other SSRIs",
+                                "MAO inhibitors",
+                                "Thioridazine",
+                                "NSAIDs",
+                                "Lithium"
+                            ],
+                            "pantoprazole": [
+                                "Atazanavir",
+                                "Nelfinavir",
+                                "Erlotinib",
+                                "Methotrexate",
+                                "Clopidogrel"
+                            ],
+                            "prednisone": [
+                                "Live vaccines",
+                                "NSAIDs",
+                                "Anticoagulants",
+                                "Diabetes medications",
+                                "Certain antibiotics"
+                            ],
+                            "losartan": [
+                                "Low-sodium foods",
+                                "Bananas",
+                                "Leafy greens",
+                                "Sweet potatoes",
+                                "Greek yogurt",
+                                "Fresh fruits and vegetables",
+                                "Whole grains",
+                                "Lean proteins"
+                            ],
+                            "gabapentin": [
+                                "High-protein foods",
+                                "Complex carbohydrates",
+                                "Fiber-rich foods",
+                                "Leafy vegetables",
+                                "B-vitamin rich foods",
+                                "Magnesium-rich foods"
+                            ],
+                            "sertraline": [
+                                "Foods rich in B-vitamins",
+                                "Whole grains",
+                                "Lean proteins",
+                                "Omega-3 rich foods",
+                                "Fresh fruits and vegetables",
+                                "Probiotic-rich foods"
+                            ],
+                            "levothyroxine": [
+                                "Iodine-rich foods",
+                                "Selenium-rich foods",
+                                "Brazil nuts",
+                                "Fish",
+                                "Eggs",
+                                "Fresh fruits and vegetables"
+                            ],
+                            "atorvastatin": [
+                                "Heart-healthy foods",
+                                "Oatmeal",
+                                "Fatty fish",
+                                "Nuts",
+                                "Olive oil",
+                                "High-fiber foods",
+                                "Plant-based proteins"
+                            ],
+                            "escitalopram": [
+                                "Foods rich in B12",
+                                "Leafy greens",
+                                "Whole grains",
+                                "Lean proteins",
+                                "Berries",
+                                "Omega-3 rich foods"
+                            ],
+                            "fluoxetine": [
+                                "Complex carbohydrates",
+                                "Protein-rich foods",
+                                "Fresh fruits",
+                                "Vegetables",
+                                "Omega-3 rich foods",
+                                "Whole grains"
+                            ],
+                            "pantoprazole": [
+                                "Non-acidic fruits",
+                                "Low-fat proteins",
+                                "Cooked vegetables",
+                                "Whole grains",
+                                "Yogurt",
+                                "Lean meats"
+                            ],
+                            "hydrochlorothiazide": [
+                                "Potassium-rich foods",
+                                "Magnesium-rich foods",
+                                "Calcium-rich foods",
+                                "Fresh fruits and vegetables",
+                                "Lean proteins",
+                                "Low-sodium foods"
+                            ],
+                            "prednisone": [
+                                "Calcium-rich foods",
+                                "Vitamin D foods",
+                                "Lean proteins",
+                                "Low-sodium foods",
+                                "Potassium-rich foods",
+                                "Anti-inflammatory foods"
+                            ]
+                           }
+
+                           meds_to_avoid = medications_to_avoid.get(med['name'], ["Information not available"])
+    
+                           col1, col2 = st.columns(2)
+    
+                           with col1:
+                               st.markdown("#### 🚫 Contraindicated Medications")
+                               for medication in meds_to_avoid:
+                                   st.write(f"• {medication}")
+    
+                           with col2:
+                               st.markdown("#### ⚠️ General Precautions")
+                               st.markdown("""
+                                * Always consult your healthcare provider before starting or stopping any medication
+                                * Inform all healthcare providers about your current medications
+                                * Keep a current list of all your medications
+                                * Check for interactions when starting new medications
+                                * Follow prescribed dosing schedules carefully
+                                """)    
+                               
+                       with success_rate_tab:
+                           st.markdown("### 📊 Treatment Success Rate")
+                           success_rate = MEDICATION_SUCCESS_RATES.get(med['name'], 0)
+                           # Create the gauge chart
+                           fig = go.Figure(go.Indicator(
+                            mode="gauge+number",
+                            value=success_rate,
+                            domain={'x': [0, 1], 'y': [0, 1]},
+                            title={'text': "Success Rate (%)", 'font': {'size': 24}},
+                            gauge={
+                                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                                'bar': {'color': "darkblue"},
+                                'bgcolor': "white",
+                                'borderwidth': 2,
+                                'bordercolor': "gray",
+                                'steps': [
+                                    {'range': [0, 50], 'color': 'red'},
+                                    {'range': [50, 75], 'color': 'yellow'},
+                                    {'range': [75, 100], 'color': 'green'}
+                                ],
+                                'threshold': {
+                                    'line': {'color': "red", 'width': 4},
+                                    'thickness': 0.75,
+                                    'value': 70
+                                }
+                            }
+                        ))
+
+                        # Update layout
+                       fig.update_layout(
+                                paper_bgcolor="rgba(0,0,0,0)",
+                                height=400,
+                                margin=dict(l=10, r=10, t=40, b=10)
+                            )
+                            
+                        # Display the chart
+                       st.plotly_chart(fig, use_container_width=True)
+    
+                        # Add contextual information
+                       if success_rate >= 80:
+                            st.success(f"This medication has a high success rate of {success_rate}%")
+                       elif success_rate >= 70:
+                            st.info(f"This medication has a moderate success rate of {success_rate}%")
+                       else:
+                            st.warning(f"This medication has a lower success rate of {success_rate}%")
+    
+                     # Add additional context
+                       st.markdown("""
+                        #### Understanding Success Rates
+                        * **High (80-100%)**: Excellent therapeutic outcomes in most patients
+                        * **Moderate (70-79%)**: Good effectiveness for most patients
+                        * **Lower (<70%)**: May require careful monitoring or dose adjustments
+                        
+                        _Note: Success rates are based on clinical studies and real-world data. Individual results may vary._
+                        """)
+
+
                else:
                    st.error("Error connecting to the medication service")
            except Exception as e:

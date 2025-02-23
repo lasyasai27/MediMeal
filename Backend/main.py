@@ -20,18 +20,6 @@ from ml.preprocess_drugs import preprocess_drug_data
 from ml.drug_recommender import DrugRecommender
 from ml.medicare_drug_analysis import MedicareDrugAnalyzer
 
-medication_prices = {
-    "Losartan": 10.00,
-    "Gabapentin": 15.00,
-    "Sertraline": 8.00,
-    "Levothyroxine": 12.00,
-    "Atorvastatin": 20.00,
-    "Escitalopram": 18.00,
-    "Fluoxetine": 9.00,
-    "Pantoprazole": 14.00,
-    "Hydrochlorothiazide": 11.00,
-    "Prednisone": 7.00,
-}
 
 
 # Configure logging
