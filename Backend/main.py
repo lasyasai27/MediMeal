@@ -22,6 +22,32 @@ from ml.medicare_drug_analysis import MedicareDrugAnalyzer
 
 
 
+# Add medication prices dictionary
+medication_prices = {
+    "Tylenol": 8.99,
+    "aspirin": 5.99,
+    "Advil Migraine": 12.99,
+    "amoxicillin": 15.99,
+    "lisinopril": 10.99,
+    "glipizide / metformin": 25.99,
+    "amlodipine": 18.99,
+    "metoprolol": 20.99,
+    "ezetimibe / simvastatin": 45.99,
+    "hydrochlorothiazide / losartan": 30.99,
+    "omeprazole": 22.99,
+    "Losartan": 28.99,
+    "gabapentin": 35.99,
+    "sertraline": 24.99,
+    "levothyroxine": 15.99,
+    "atorvastatin": 32.99,
+    "escitalopram": 27.99,
+    "fluoxetine": 23.99,
+    "pantoprazole": 26.99,
+    "amiloride / hydrochlorothiazide": 38.99,
+    "prednisone": 12.99
+}
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +57,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MediMeal API")
+analyzer: MedicareDrugAnalyzer = None  # Define analyzer globally
+
 
 # Add CORS middleware
 app.add_middleware(
@@ -94,6 +122,7 @@ class ModelTrainer:
     def __init__(self):
         self.data_dir = os.path.join(os.path.dirname(__file__), 'data')
         self.models = {}
+        self.medication_prices = medication_prices  # Add this line
         
     def train_all_models(self):
         print("Training models for available datasets...")
